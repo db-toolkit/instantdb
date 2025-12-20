@@ -1,6 +1,6 @@
 # instant-db
 
-Instant, isolated PostgreSQL instances for development. Zero configuration.
+A CLI tool that spins up isolated database instances instantly for development, with zero configuration.
 
 ## Features
 
@@ -132,16 +132,6 @@ instant-db stop <id>
 4. **Metadata Tracking** - Instance info stored in `~/.instant-db/*.json`
 5. **Clean Shutdown** - Graceful process termination
 6. **Zero Traces** - Non-persistent instances are completely removed on stop
-
-## Roadmap
-
-- [x] PostgreSQL support
-- [x] Pause/resume functionality
-- [ ] MySQL support
-- [ ] MongoDB support
-- [ ] Snapshot/restore functionality
-- [ ] Clone from existing database
-- [ ] Pre-load data from SQL file
 
 ## Contributing
 
