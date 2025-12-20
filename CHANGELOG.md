@@ -8,6 +8,5 @@
 - Commands: start, stop, pause, resume, list, url, status
 - Auto port allocation and isolated data directories
 - Persistent and ephemeral modes
-- Graceful Ctrl+C handling
 - Cross-platform support (macOS, Linux, Windows)
 - Automated GitHub releases with pre-built binaries
