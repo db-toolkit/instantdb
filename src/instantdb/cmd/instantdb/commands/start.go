@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/types"
 	"github.com/spf13/cobra"
@@ -28,14 +31,35 @@ func StartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&startName, "name", "n", "", "Instance name")
 	cmd.Flags().IntVarP(&startPort, "port", "p", 0, "Port number (auto-assigned if not specified)")
 	cmd.Flags().BoolVar(&startPersist, "persist", false, "Keep data after stop")
-	cmd.Flags().StringVarP(&startUsername, "username", "u", "postgres", "Database username")
-	cmd.Flags().StringVar(&startPassword, "password", "postgres", "Database password")
+	cmd.Flags().StringVarP(&startUsername, "username", "u", "", "Database username")
+	cmd.Flags().StringVar(&startPassword, "password", "", "Database password")
 
 	return cmd
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
+	reader := bufio.NewReader(os.Stdin)
+
+	// Prompt for username if not provided
+	if startUsername == "" {
+		fmt.Print("Enter database username (default: postgres): ")
+		input, _ := reader.ReadString('\n')
+		startUsername = strings.TrimSpace(input)
+		if startUsername == "" {
+			startUsername = "postgres"
+		}
+	}
+
+	// Prompt for password if not provided
+	if startPassword == "" {
+		fmt.Print("Enter database password (default: postgres): ")
+		input, _ := reader.ReadString('\n')
+		startPassword = strings.TrimSpace(input)
+		if startPassword == "" {
+			startPassword = "postgres"
+		}
+	}
 
 	config := types.Config{
 		Name:     startName,
@@ -45,7 +69,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		Password: startPassword,
 	}
 
-	fmt.Println("🚀 Starting PostgreSQL instance...")
+	fmt.Println("\n🚀 Starting PostgreSQL instance...")
 
 	instance, err := Engine.Start(ctx, config)
 	if err != nil {

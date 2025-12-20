@@ -67,20 +67,25 @@ instant-db stop a1b2c3d4e5f6
 ### Start an instance
 
 ```bash
-# Basic start (auto-assigned port, default credentials: postgres/postgres)
+# Interactive mode (prompts for username/password)
 instant-db start
 
-# With custom name
-instant-db start --name myapp
+# Output:
+# Enter database username (default: postgres): myuser
+# Enter database password (default: postgres): mypass
+# 🚀 Starting PostgreSQL instance...
 
-# With specific port
-instant-db start --port 5432
-
-# With custom credentials
+# Non-interactive with flags
 instant-db start -u myuser -password mypass
 
+# With custom name
+instant-db start --name myapp -u admin -password secret
+
+# With specific port
+instant-db start --port 5432 -u myuser -password mypass
+
 # Persistent data (survives stop)
-instant-db start --persist
+instant-db start --persist -u myuser -password mypass
 
 # All options
 instant-db start --name myapp --port 5432 -u admin -password secret --persist
