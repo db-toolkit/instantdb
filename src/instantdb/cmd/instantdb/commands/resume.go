@@ -23,9 +23,14 @@ func runResume(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	instanceID := args[0]
 
+	engine, err := GetEngineForInstance(instanceID)
+	if err != nil {
+		return err
+	}
+
 	// Show spinner while resuming
-	err := ui.ShowSpinner(fmt.Sprintf("Resuming instance %s", instanceID), func() error {
-		return Engine.Resume(ctx, instanceID)
+	err = ui.ShowSpinner(fmt.Sprintf("Resuming instance %s", instanceID), func() error {
+		return engine.Resume(ctx, instanceID)
 	})
 
 	if err != nil {

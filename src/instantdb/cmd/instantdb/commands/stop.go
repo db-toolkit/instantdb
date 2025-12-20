@@ -23,9 +23,14 @@ func runStop(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	instanceID := args[0]
 
+	engine, err := GetEngineForInstance(instanceID)
+	if err != nil {
+		return err
+	}
+
 	// Show spinner while stopping
-	err := ui.ShowSpinner(fmt.Sprintf("Stopping instance %s", instanceID), func() error {
-		return Engine.Stop(ctx, instanceID)
+	err = ui.ShowSpinner(fmt.Sprintf("Stopping instance %s", instanceID), func() error {
+		return engine.Stop(ctx, instanceID)
 	})
 
 	if err != nil {

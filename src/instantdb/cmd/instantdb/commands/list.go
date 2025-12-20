@@ -18,12 +18,14 @@ func ListCmd() *cobra.Command {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	instances, err := Engine.List()
-	if err != nil {
-		return fmt.Errorf("failed to list instances: %w", err)
-	}
+	// Get all instances from both engines
+	postgresInstances, _ := Engine.List()
+	mysqlInstances, _ := MySQLEngine.List()
+	
+	// Combine all instances
+	allInstances := append(postgresInstances, mysqlInstances...)
 
-	fmt.Println(ui.RenderInstanceTable(instances))
+	fmt.Println(ui.RenderInstanceTable(allInstances))
 
 	return nil
 }

@@ -15,14 +15,15 @@ var (
 	startPersist  bool
 	startUsername string
 	startPassword string
+	startEngine   string
 )
 
 // StartCmd returns the start command
 func StartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "Start a new PostgreSQL instance",
-		Long:  `Start a new isolated PostgreSQL instance with automatic configuration.`,
+		Short: "Start a new database instance",
+		Long:  `Start a new isolated database instance with automatic configuration.`,
 		RunE:  runStart,
 	}
 
@@ -31,6 +32,7 @@ func StartCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&startPersist, "persist", false, "Keep data after stop")
 	cmd.Flags().StringVarP(&startUsername, "username", "u", "", "Database username")
 	cmd.Flags().StringVar(&startPassword, "password", "", "Database password")
+	cmd.Flags().StringVarP(&startEngine, "engine", "e", "postgres", "Database engine (postgres, mysql)")
 
 	return cmd
 }
@@ -38,14 +40,27 @@ func StartCmd() *cobra.Command {
 func runStart(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
+	// Validate engine
+	if startEngine != "postgres" && startEngine != "mysql" {
+		return fmt.Errorf("unsupported engine: %s (supported: postgres, mysql)", startEngine)
+	}
+
 	// Prompt for username if not provided
 	if startUsername == "" {
-		startUsername = ui.PromptString("Enter database username", "postgres")
+		defaultUser := "postgres"
+		if startEngine == "mysql" {
+			defaultUser = "root"
+		}
+		startUsername = ui.PromptString("Enter database username", defaultUser)
 	}
 
 	// Prompt for password if not provided
 	if startPassword == "" {
-		startPassword = ui.PromptPassword("Enter database password", "postgres")
+		defaultPass := "postgres"
+		if startEngine == "mysql" {
+			defaultPass = "password"
+		}
+		startPassword = ui.PromptPassword("Enter database password", defaultPass)
 	}
 
 	config := types.Config{
@@ -59,9 +74,13 @@ func runStart(cmd *cobra.Command, args []string) error {
 	var instance *types.Instance
 	
 	// Show spinner while starting
-	err := ui.ShowSpinner("Starting PostgreSQL instance", func() error {
+	err := ui.ShowSpinner(fmt.Sprintf("Starting %s instance", startEngine), func() error {
 		var err error
-		instance, err = Engine.Start(ctx, config)
+		if startEngine == "mysql" {
+			instance, err = MySQLEngine.Start(ctx, config)
+		} else {
+			instance, err = Engine.Start(ctx, config)
+		}
 		return err
 	})
 

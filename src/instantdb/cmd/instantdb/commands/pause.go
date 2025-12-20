@@ -23,9 +23,14 @@ func runPause(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	instanceID := args[0]
 
+	engine, err := GetEngineForInstance(instanceID)
+	if err != nil {
+		return err
+	}
+
 	// Show spinner while pausing
-	err := ui.ShowSpinner(fmt.Sprintf("Pausing instance %s", instanceID), func() error {
-		return Engine.Pause(ctx, instanceID)
+	err = ui.ShowSpinner(fmt.Sprintf("Pausing instance %s", instanceID), func() error {
+		return engine.Pause(ctx, instanceID)
 	})
 
 	if err != nil {

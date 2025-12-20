@@ -23,7 +23,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	instanceID := args[0]
 
-	status, err := Engine.Status(ctx, instanceID)
+	engine, err := GetEngineForInstance(instanceID)
+	if err != nil {
+		return err
+	}
+
+	status, err := engine.Status(ctx, instanceID)
 	if err != nil {
 		return fmt.Errorf("failed to get status: %w", err)
 	}

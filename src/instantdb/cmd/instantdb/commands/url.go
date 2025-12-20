@@ -20,7 +20,12 @@ func URLCmd() *cobra.Command {
 func runURL(cmd *cobra.Command, args []string) error {
 	instanceID := args[0]
 
-	url, err := Engine.GetConnectionURL(instanceID)
+	engine, err := GetEngineForInstance(instanceID)
+	if err != nil {
+		return err
+	}
+
+	url, err := engine.GetConnectionURL(instanceID)
 	if err != nil {
 		return fmt.Errorf("failed to get connection URL: %w", err)
 	}
