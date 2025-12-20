@@ -12,14 +12,6 @@ A CLI tool that spins up isolated database instances instantly for development, 
 - 📦 Persistent or ephemeral - your choice
 - ⏸️ Pause/resume instances to save resources
 
-## Requirements
-
-**None!** PostgreSQL binaries are automatically downloaded on first use.
-
-- Binaries are cached in `~/.embedded-postgres-go/`
-- Works on macOS, Linux, and Windows
-- No manual installation needed
-
 ## Installation
 
 ```bash
@@ -89,49 +81,6 @@ instant-db --version
 # Show help
 instant-db --help
 ```
-
-## Use Cases
-
-### Quick Testing
-```bash
-instant-db start
-# Run your tests
-instant-db stop <id>
-```
-
-### Feature Branch Development
-```bash
-instant-db start --name feature-auth --persist
-# Develop your feature
-instant-db pause <id>  # Free resources when not working
-instant-db resume <id> # Continue later
-```
-
-### Integration with Migrator
-```bash
-# Start database
-instant-db start --name myapp
-
-# Get URL and set environment
-export DATABASE_URL=$(instant-db url <id>)
-
-# Run migrations
-migrator init
-migrator makemigrations "initial"
-migrator migrate
-
-# Clean up
-instant-db stop <id>
-```
-
-## How It Works
-
-1. **Embedded PostgreSQL** - Binaries downloaded automatically on first use
-2. **Isolated Data Directories** - Each instance gets its own data directory in `~/.instant-db/data/`
-3. **Auto Port Allocation** - Finds available ports automatically
-4. **Metadata Tracking** - Instance info stored in `~/.instant-db/*.json`
-5. **Clean Shutdown** - Graceful process termination
-6. **Zero Traces** - Non-persistent instances are completely removed on stop
 
 ## Contributing
 
