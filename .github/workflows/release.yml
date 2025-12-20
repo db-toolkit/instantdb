@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          # macOS ARM64
+          GOOS=darwin GOARCH=arm64 go build -o instant-db-darwin-arm64 src/instantdb/cmd/instantdb/main.go
+          
+          # macOS AMD64
+          GOOS=darwin GOARCH=amd64 go build -o instant-db-darwin-amd64 src/instantdb/cmd/instantdb/main.go
+          
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 go build -o instant-db-linux-arm64 src/instantdb/cmd/instantdb/main.go
+          
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build -o instant-db-linux-amd64 src/instantdb/cmd/instantdb/main.go
+          
+          # Windows AMD64
+          GOOS=windows GOARCH=amd64 go build -o instant-db-windows-amd64.exe src/instantdb/cmd/instantdb/main.go
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            instant-db-darwin-arm64
+            instant-db-darwin-amd64
+            instant-db-linux-arm64
+            instant-db-linux-amd64
+            instant-db-windows-amd64.exe
+          body: |
+            ## Installation
+            
+            ### macOS
+            ```bash
+            # ARM64 (M1/M2/M3)
+            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-darwin-arm64 -o instant-db
+            chmod +x instant-db
+            sudo mv instant-db /usr/local/bin/
+            
+            # Intel
+            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-darwin-amd64 -o instant-db
+            chmod +x instant-db
+            sudo mv instant-db /usr/local/bin/
+            ```
+            
+            ### Linux
+            ```bash
+            # ARM64
+            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-linux-arm64 -o instant-db
+            chmod +x instant-db
+            sudo mv instant-db /usr/local/bin/
+            
+            # AMD64
+            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-linux-amd64 -o instant-db
+            chmod +x instant-db
+            sudo mv instant-db /usr/local/bin/
+            ```
+            
+            ### Windows
+            Download `instant-db-windows-amd64.exe` and add to PATH.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
