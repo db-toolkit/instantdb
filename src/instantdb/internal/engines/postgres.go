@@ -45,6 +45,12 @@ func (e *PostgresEngine) Start(ctx context.Context, config types.Config) (*types
 	if config.DataDir == "" {
 		config.DataDir = filepath.Join(e.baseDir, instanceID)
 	}
+	if config.Username == "" {
+		config.Username = "postgres"
+	}
+	if config.Password == "" {
+		config.Password = "postgres"
+	}
 
 	// Create data directory
 	if err := os.MkdirAll(config.DataDir, 0755); err != nil {
@@ -56,6 +62,8 @@ func (e *PostgresEngine) Start(ctx context.Context, config types.Config) (*types
 	postgres := embeddedpostgres.NewDatabase(
 		embeddedpostgres.DefaultConfig().
 			Port(uint32(config.Port)).
+			Username(config.Username).
+			Password(config.Password).
 			DataPath(config.DataDir).
 			RuntimePath(filepath.Join(os.TempDir(), "embedded-pg-runtime")).
 			StartTimeout(30 * time.Second),
@@ -81,6 +89,8 @@ func (e *PostgresEngine) Start(ctx context.Context, config types.Config) (*types
 		Status:    "running",
 		CreatedAt: time.Now().Unix(),
 		Persist:   config.Persist,
+		Username:  config.Username,
+		Password:  config.Password,
 	}
 
 	// Save instance metadata
@@ -160,7 +170,8 @@ func (e *PostgresEngine) GetConnectionURL(instanceID string) (string, error) {
 		return "", fmt.Errorf("instance not found: %w", err)
 	}
 
-	return fmt.Sprintf("postgresql://postgres:postgres@localhost:%d/postgres?sslmode=disable", instance.Port), nil
+	return fmt.Sprintf("postgresql://%s:%s@localhost:%d/postgres?sslmode=disable", 
+		instance.Username, instance.Password, instance.Port), nil
 }
 
 // List returns all running PostgreSQL instances

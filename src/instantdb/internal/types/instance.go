@@ -11,4 +11,6 @@ type Instance struct {
 	Status    string
 	CreatedAt int64
 	Persist   bool
+	Username  string
+	Password  string
 }
