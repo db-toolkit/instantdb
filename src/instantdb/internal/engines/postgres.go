@@ -144,12 +144,26 @@ func (e *PostgresEngine) Pause(ctx context.Context, instanceID string) error {
 		return fmt.Errorf("instance is already paused")
 	}
 
-	// Stop the postgres instance if we have a reference
+	// Try to stop using our reference first
 	if postgres, exists := e.instances[instanceID]; exists {
 		if err := postgres.Stop(); err != nil {
 			return fmt.Errorf("failed to pause server: %w", err)
 		}
 		delete(e.instances, instanceID)
+	} else {
+		// If no reference, we need to find and kill the process
+		// This happens when CLI is restarted
+		// For now, we'll create a new instance just to stop it
+		postgres := embeddedpostgres.NewDatabase(
+			embeddedpostgres.DefaultConfig().
+				Port(uint32(instance.Port)).
+				DataPath(instance.DataDir).
+				RuntimePath(filepath.Join(os.TempDir(), "embedded-pg-runtime")),
+		)
+		// Stop will kill any process using this port/data dir
+		if err := postgres.Stop(); err != nil {
+			// Ignore error if already stopped
+		}
 	}
 
 	// Mark as paused and save
