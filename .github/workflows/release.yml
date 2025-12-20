@@ -52,37 +52,6 @@ jobs:
             instant-db-linux-arm64
             instant-db-linux-amd64
             instant-db-windows-amd64.exe
-          body: |
-            ## Installation
-            
-            ### macOS
-            ```bash
-            # ARM64 (M1/M2/M3)
-            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-darwin-arm64 -o instant-db
-            chmod +x instant-db
-            sudo mv instant-db /usr/local/bin/
-            
-            # Intel
-            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-darwin-amd64 -o instant-db
-            chmod +x instant-db
-            sudo mv instant-db /usr/local/bin/
-            ```
-            
-            ### Linux
-            ```bash
-            # ARM64
-            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-linux-arm64 -o instant-db
-            chmod +x instant-db
-            sudo mv instant-db /usr/local/bin/
-            
-            # AMD64
-            curl -L https://github.com/db-toolkit/instant-db/releases/download/${{ steps.version.outputs.VERSION }}/instant-db-linux-amd64 -o instant-db
-            chmod +x instant-db
-            sudo mv instant-db /usr/local/bin/
-            ```
-            
-            ### Windows
-            Download `instant-db-windows-amd64.exe` and add to PATH.
           draft: false
           prerelease: false
         env:
