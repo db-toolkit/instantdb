@@ -1,4 +1,4 @@
-# instant-db
+# INSTANT-DB
 
 A CLI tool that spins up isolated database instances instantly for development, with zero configuration.
 
@@ -85,10 +85,6 @@ instant-db --help
 ## Contributing
 
 Contributions welcome! Please open an issue or PR.
-
-## License
-
-MIT
 
 ## Part of DB Toolkit
 
