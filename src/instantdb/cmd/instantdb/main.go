@@ -5,11 +5,15 @@ import (
 	"os"
 
 	"github.com/db-toolkit/instant-db/src/instantdb/cmd/instantdb/commands"
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/ui"
 )
 
 var version = "0.1.0"
 
 func main() {
+	// Setup graceful signal handling
+	ui.SetupSignalHandler()
+
 	rootCmd := commands.GetRootCommand(version)
 	
 	if err := rootCmd.Execute(); err != nil {
