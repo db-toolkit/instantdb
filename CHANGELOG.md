@@ -1,16 +1,13 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-## [0.1.0] - 2025-12-20
+## [0.1.0] - 2025-12-21
 
 ### Added
-- Initial release
-- PostgreSQL support
-- CLI commands: start, stop, list, url, status
-- Auto port allocation
-- Isolated data directories
-- Instance metadata persistence
-- Graceful shutdown
+- PostgreSQL support with embedded binaries (zero dependencies)
+- Interactive credential prompts with Bubble Tea UI
+- Commands: start, stop, pause, resume, list, url, status
+- Auto port allocation and isolated data directories
 - Persistent and ephemeral modes
-- Health checks
+- Graceful Ctrl+C handling
+- Cross-platform support (macOS, Linux, Windows)
+- Automated GitHub releases with pre-built binaries
