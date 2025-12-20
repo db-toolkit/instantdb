@@ -67,7 +67,7 @@ instant-db stop a1b2c3d4e5f6
 ### Start an instance
 
 ```bash
-# Basic start (auto-assigned port, ephemeral)
+# Basic start (auto-assigned port, default credentials: postgres/postgres)
 instant-db start
 
 # With custom name
@@ -76,11 +76,14 @@ instant-db start --name myapp
 # With specific port
 instant-db start --port 5432
 
+# With custom credentials
+instant-db start -u myuser -password mypass
+
 # Persistent data (survives stop)
 instant-db start --persist
 
 # All options
-instant-db start --name myapp --port 5432 --persist
+instant-db start --name myapp --port 5432 -u admin -password secret --persist
 ```
 
 ### List instances
