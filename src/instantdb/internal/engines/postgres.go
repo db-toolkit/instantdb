@@ -133,6 +133,76 @@ func (e *PostgresEngine) Stop(ctx context.Context, instanceID string) error {
 	return nil
 }
 
+// Pause pauses a running PostgreSQL instance
+func (e *PostgresEngine) Pause(ctx context.Context, instanceID string) error {
+	instance, err := utils.LoadInstance(instanceID)
+	if err != nil {
+		return fmt.Errorf("instance not found: %w", err)
+	}
+
+	if instance.Paused {
+		return fmt.Errorf("instance is already paused")
+	}
+
+	// Stop the postgres instance if we have a reference
+	if postgres, exists := e.instances[instanceID]; exists {
+		if err := postgres.Stop(); err != nil {
+			return fmt.Errorf("failed to pause server: %w", err)
+		}
+		delete(e.instances, instanceID)
+	}
+
+	// Mark as paused and save
+	instance.Paused = true
+	instance.Status = "paused"
+	if err := utils.SaveInstance(instance); err != nil {
+		return fmt.Errorf("failed to save instance: %w", err)
+	}
+
+	return nil
+}
+
+// Resume resumes a paused PostgreSQL instance
+func (e *PostgresEngine) Resume(ctx context.Context, instanceID string) error {
+	instance, err := utils.LoadInstance(instanceID)
+	if err != nil {
+		return fmt.Errorf("instance not found: %w", err)
+	}
+
+	if !instance.Paused {
+		return fmt.Errorf("instance is not paused")
+	}
+
+	// Create embedded postgres instance
+	postgres := embeddedpostgres.NewDatabase(
+		embeddedpostgres.DefaultConfig().
+			Port(uint32(instance.Port)).
+			Username(instance.Username).
+			Password(instance.Password).
+			DataPath(instance.DataDir).
+			RuntimePath(filepath.Join(os.TempDir(), "embedded-pg-runtime")).
+			StartTimeout(30 * time.Second),
+	)
+
+	// Start PostgreSQL
+	if err := postgres.Start(); err != nil {
+		return fmt.Errorf("failed to resume postgres: %w", err)
+	}
+
+	// Store instance reference
+	e.instances[instanceID] = postgres
+
+	// Mark as running and save
+	instance.Paused = false
+	instance.Status = "running"
+	if err := utils.SaveInstance(instance); err != nil {
+		postgres.Stop()
+		return fmt.Errorf("failed to save instance: %w", err)
+	}
+
+	return nil
+}
+
 // Status returns the status of a PostgreSQL instance
 func (e *PostgresEngine) Status(ctx context.Context, instanceID string) (*types.Status, error) {
 	instance, err := utils.LoadInstance(instanceID)

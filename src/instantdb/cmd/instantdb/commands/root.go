@@ -31,6 +31,8 @@ func GetRootCommand(version string) *cobra.Command {
 	// Add all commands
 	rootCmd.AddCommand(StartCmd())
 	rootCmd.AddCommand(StopCmd())
+	rootCmd.AddCommand(PauseCmd())
+	rootCmd.AddCommand(ResumeCmd())
 	rootCmd.AddCommand(ListCmd())
 	rootCmd.AddCommand(URLCmd())
 	rootCmd.AddCommand(StatusCmd())

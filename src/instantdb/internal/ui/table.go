@@ -22,10 +22,15 @@ func RenderInstanceTable(instances []*types.Instance) string {
 
 	// Simple list
 	for _, instance := range instances {
+		status := instance.Status
+		if instance.Paused {
+			status = "paused"
+		}
+		
 		b.WriteString(SuccessStyle.Render(fmt.Sprintf("  • %s\n", instance.Name)))
 		b.WriteString(fmt.Sprintf("    ID:     %s\n", instance.ID))
 		b.WriteString(fmt.Sprintf("    Port:   %d\n", instance.Port))
-		b.WriteString(fmt.Sprintf("    Status: %s\n", instance.Status))
+		b.WriteString(fmt.Sprintf("    Status: %s\n", status))
 		b.WriteString("\n")
 	}
 

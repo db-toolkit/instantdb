@@ -13,4 +13,5 @@ type Instance struct {
 	Persist   bool
 	Username  string
 	Password  string
+	Paused    bool
 }

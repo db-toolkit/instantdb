@@ -14,6 +14,12 @@ type Engine interface {
 	// Stop stops a running database instance
 	Stop(ctx context.Context, instanceID string) error
 	
+	// Pause pauses a running database instance
+	Pause(ctx context.Context, instanceID string) error
+	
+	// Resume resumes a paused database instance
+	Resume(ctx context.Context, instanceID string) error
+	
 	// Status returns the status of a database instance
 	Status(ctx context.Context, instanceID string) (*types.Status, error)
 	
