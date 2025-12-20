@@ -1,10 +1,10 @@
-# INSTANT-DB
+# Instant Db
 
 A CLI tool that spins up isolated database instances instantly for development, with zero configuration.
 
 ## Features
 
-- 🚀 Start PostgreSQL instances in seconds
+- 🚀 Start database instances in seconds
 - 🔒 Fully isolated - no conflicts with existing databases
 - 🧹 Clean shutdown - zero traces left behind
 - 💻 Cross-platform - macOS, Linux, Windows
@@ -15,14 +15,13 @@ A CLI tool that spins up isolated database instances instantly for development, 
 ## Installation
 
 ```bash
-# Clone the repository
+# Quick install
+curl -sSL https://raw.githubusercontent.com/db-toolkit/instant-db/main/install.sh | bash
+
+# Or manual install
 git clone https://github.com/db-toolkit/instant-db.git
 cd instant-db
-
-# Build
 go build -o instant-db src/instantdb/cmd/instantdb/main.go
-
-# Move to PATH (optional)
 sudo mv instant-db /usr/local/bin/
 ```
 
