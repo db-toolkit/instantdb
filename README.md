@@ -13,17 +13,11 @@ Instant, isolated PostgreSQL instances for development. Zero configuration.
 
 ## Requirements
 
-- PostgreSQL installed on your system
-  ```bash
-  # macOS
-  brew install postgresql@16
-  
-  # Ubuntu/Debian
-  sudo apt-get install postgresql
-  
-  # Fedora/RHEL
-  sudo dnf install postgresql-server
-  ```
+**None!** PostgreSQL binaries are automatically downloaded on first use.
+
+- Binaries are cached in `~/.embedded-postgres-go/`
+- Works on macOS, Linux, and Windows
+- No manual installation needed
 
 ## Installation
 

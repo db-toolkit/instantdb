@@ -4,23 +4,25 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
+	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/types"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
 )
 
 // PostgresEngine implements the Engine interface for PostgreSQL
 type PostgresEngine struct {
-	baseDir string
+	baseDir   string
+	instances map[string]*embeddedpostgres.EmbeddedPostgres
 }
 
 // NewPostgresEngine creates a new PostgreSQL engine
 func NewPostgresEngine(baseDir string) *PostgresEngine {
 	return &PostgresEngine{
-		baseDir: baseDir,
+		baseDir:   baseDir,
+		instances: make(map[string]*embeddedpostgres.EmbeddedPostgres),
 	}
 }
 
@@ -49,34 +51,33 @@ func (e *PostgresEngine) Start(ctx context.Context, config types.Config) (*types
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	// Initialize PostgreSQL data directory
-	if err := e.initDB(ctx, config.DataDir); err != nil {
+	// Create embedded postgres instance
+	// Binaries will be downloaded automatically to ~/.embedded-postgres-go/
+	postgres := embeddedpostgres.NewDatabase(
+		embeddedpostgres.DefaultConfig().
+			Port(uint32(config.Port)).
+			DataPath(config.DataDir).
+			RuntimePath(filepath.Join(os.TempDir(), "embedded-pg-runtime")).
+			StartTimeout(30 * time.Second),
+	)
+
+	// Start PostgreSQL
+	if err := postgres.Start(); err != nil {
 		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
+		return nil, fmt.Errorf("failed to start postgres: %w", err)
 	}
 
-	// Start PostgreSQL server
-	pid, err := e.startServer(ctx, config.DataDir, config.Port)
-	if err != nil {
-		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("failed to start server: %w", err)
-	}
+	// Store instance reference
+	e.instances[instanceID] = postgres
 
-	// Wait for server to be ready
-	if err := e.waitForReady(ctx, config.Port); err != nil {
-		e.stopServer(pid)
-		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("server failed to become ready: %w", err)
-	}
-
-	// Create instance
+	// Create instance metadata
 	instance := &types.Instance{
 		ID:        instanceID,
 		Name:      config.Name,
 		Engine:    "postgres",
 		Port:      config.Port,
 		DataDir:   config.DataDir,
-		PID:       pid,
+		PID:       0, // embedded-postgres manages the process
 		Status:    "running",
 		CreatedAt: time.Now().Unix(),
 		Persist:   config.Persist,
@@ -84,7 +85,7 @@ func (e *PostgresEngine) Start(ctx context.Context, config types.Config) (*types
 
 	// Save instance metadata
 	if err := utils.SaveInstance(instance); err != nil {
-		e.stopServer(pid)
+		postgres.Stop()
 		os.RemoveAll(config.DataDir)
 		return nil, fmt.Errorf("failed to save instance: %w", err)
 	}
@@ -99,9 +100,12 @@ func (e *PostgresEngine) Stop(ctx context.Context, instanceID string) error {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	// Stop the server
-	if err := e.stopServer(instance.PID); err != nil {
-		return fmt.Errorf("failed to stop server: %w", err)
+	// Stop the postgres instance if we have a reference
+	if postgres, exists := e.instances[instanceID]; exists {
+		if err := postgres.Stop(); err != nil {
+			return fmt.Errorf("failed to stop server: %w", err)
+		}
+		delete(e.instances, instanceID)
 	}
 
 	// Clean up data directory if not persistent
@@ -130,22 +134,21 @@ func (e *PostgresEngine) Status(ctx context.Context, instanceID string) (*types.
 		}, nil
 	}
 
-	// Check if process is running
-	running := utils.IsProcessRunning(instance.PID)
-	if !running {
+	// Check if we have an active reference
+	_, exists := e.instances[instanceID]
+	
+	// Check if data directory exists
+	if _, err := os.Stat(instance.DataDir); os.IsNotExist(err) {
 		return &types.Status{
 			Running: false,
 			Healthy: false,
-			Message: "process not running",
+			Message: "data directory not found",
 		}, nil
 	}
 
-	// Check if server is healthy
-	healthy := e.isHealthy(ctx, instance.Port)
-	
 	return &types.Status{
-		Running: running,
-		Healthy: healthy,
+		Running: exists,
+		Healthy: exists,
 		Message: "ok",
 	}, nil
 }
@@ -157,7 +160,7 @@ func (e *PostgresEngine) GetConnectionURL(instanceID string) (string, error) {
 		return "", fmt.Errorf("instance not found: %w", err)
 	}
 
-	return fmt.Sprintf("postgresql://localhost:%d/postgres", instance.Port), nil
+	return fmt.Sprintf("postgresql://postgres:postgres@localhost:%d/postgres?sslmode=disable", instance.Port), nil
 }
 
 // List returns all running PostgreSQL instances
@@ -176,100 +179,4 @@ func (e *PostgresEngine) List() ([]*types.Instance, error) {
 	}
 
 	return postgresInstances, nil
-}
-
-// initDB initializes a PostgreSQL data directory
-func (e *PostgresEngine) initDB(ctx context.Context, dataDir string) error {
-	cmd := exec.CommandContext(ctx, "initdb", "-D", dataDir, "--no-locale", "--encoding=UTF8")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("initdb failed: %w", err)
-	}
-	
-	return nil
-}
-
-// startServer starts the PostgreSQL server
-func (e *PostgresEngine) startServer(ctx context.Context, dataDir string, port int) (int, error) {
-	cmd := exec.CommandContext(
-		ctx,
-		"postgres",
-		"-D", dataDir,
-		"-p", fmt.Sprintf("%d", port),
-		"-k", dataDir, // Unix socket directory
-	)
-	
-	// Redirect output to log file
-	logFile := filepath.Join(dataDir, "postgres.log")
-	f, err := os.Create(logFile)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create log file: %w", err)
-	}
-	defer f.Close()
-	
-	cmd.Stdout = f
-	cmd.Stderr = f
-	
-	if err := cmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to start postgres: %w", err)
-	}
-	
-	return cmd.Process.Pid, nil
-}
-
-// stopServer stops the PostgreSQL server
-func (e *PostgresEngine) stopServer(pid int) error {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return fmt.Errorf("failed to find process: %w", err)
-	}
-	
-	// Send SIGTERM for graceful shutdown
-	if err := process.Signal(os.Interrupt); err != nil {
-		return fmt.Errorf("failed to stop process: %w", err)
-	}
-	
-	// Wait for process to exit (with timeout)
-	done := make(chan error, 1)
-	go func() {
-		_, err := process.Wait()
-		done <- err
-	}()
-	
-	select {
-	case <-time.After(10 * time.Second):
-		// Force kill if not stopped
-		process.Kill()
-		return fmt.Errorf("process did not stop gracefully, killed")
-	case err := <-done:
-		return err
-	}
-}
-
-// waitForReady waits for PostgreSQL to be ready to accept connections
-func (e *PostgresEngine) waitForReady(ctx context.Context, port int) error {
-	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for server to be ready")
-		case <-ticker.C:
-			if e.isHealthy(ctx, port) {
-				return nil
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-}
-
-// isHealthy checks if PostgreSQL is healthy
-func (e *PostgresEngine) isHealthy(ctx context.Context, port int) bool {
-	cmd := exec.CommandContext(ctx, "pg_isready", "-p", fmt.Sprintf("%d", port))
-	return cmd.Run() == nil
 }
