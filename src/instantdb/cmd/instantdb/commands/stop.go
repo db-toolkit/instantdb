@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -22,13 +23,16 @@ func runStop(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	instanceID := args[0]
 
-	fmt.Printf("🛑 Stopping instance %s...\n", instanceID)
+	// Show spinner while stopping
+	err := ui.ShowSpinner(fmt.Sprintf("Stopping instance %s", instanceID), func() error {
+		return Engine.Stop(ctx, instanceID)
+	})
 
-	if err := Engine.Stop(ctx, instanceID); err != nil {
+	if err != nil {
 		return fmt.Errorf("failed to stop instance: %w", err)
 	}
 
-	fmt.Println("✅ Instance stopped successfully!")
+	fmt.Println(ui.SuccessStyle.Render("✅ Instance stopped successfully!\n"))
 
 	return nil
 }

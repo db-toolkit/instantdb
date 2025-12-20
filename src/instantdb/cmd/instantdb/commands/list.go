@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -22,21 +23,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to list instances: %w", err)
 	}
 
-	if len(instances) == 0 {
-		fmt.Println("No running instances found.")
-		fmt.Println("\n💡 Start a new instance: instant-db start")
-		return nil
-	}
-
-	fmt.Printf("\n📋 Running Instances (%d)\n\n", len(instances))
-
-	for _, instance := range instances {
-		fmt.Printf("  • %s\n", instance.Name)
-		fmt.Printf("    ID:     %s\n", instance.ID)
-		fmt.Printf("    Port:   %d\n", instance.Port)
-		fmt.Printf("    Status: %s\n", instance.Status)
-		fmt.Println()
-	}
+	fmt.Println(ui.RenderInstanceTable(instances))
 
 	return nil
 }

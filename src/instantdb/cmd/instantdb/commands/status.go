@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -27,21 +28,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get status: %w", err)
 	}
 
-	fmt.Printf("\n📊 Instance Status: %s\n\n", instanceID)
-
-	if status.Running {
-		fmt.Println("  Running:  ✅ Yes")
-	} else {
-		fmt.Println("  Running:  ❌ No")
-	}
-
-	if status.Healthy {
-		fmt.Println("  Healthy:  ✅ Yes")
-	} else {
-		fmt.Println("  Healthy:  ❌ No")
-	}
-
-	fmt.Printf("  Message:  %s\n\n", status.Message)
+	fmt.Println(ui.RenderStatus(instanceID, status))
 
 	return nil
 }
