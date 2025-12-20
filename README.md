@@ -10,6 +10,7 @@ Instant, isolated PostgreSQL instances for development. Zero configuration.
 - 💻 Cross-platform - macOS, Linux, Windows
 - 🎯 Auto-assigned ports - no configuration needed
 - 📦 Persistent or ephemeral - your choice
+- ⏸️ Pause/resume instances to save resources
 
 ## Requirements
 
@@ -36,105 +37,57 @@ sudo mv instant-db /usr/local/bin/
 ## Quick Start
 
 ```bash
-# Start a PostgreSQL instance
+# Start a PostgreSQL instance (interactive prompts for credentials)
 instant-db start
-
-# Output:
-# 🚀 Starting PostgreSQL instance...
-# 
-# ✅ PostgreSQL instance started successfully!
-# 
-#   Instance ID:  a1b2c3d4e5f6...
-#   Name:         postgres-a1b2c3d4
-#   Port:         54321
-#   Connection:   postgresql://localhost:54321/postgres
-
-# Get connection URL
-instant-db url a1b2c3d4e5f6
 
 # List all instances
 instant-db list
 
-# Check instance status
-instant-db status a1b2c3d4e5f6
+# Get connection URL
+instant-db url <instance-id>
+
+# Pause instance (stops process, keeps data)
+instant-db pause <instance-id>
+
+# Resume paused instance
+instant-db resume <instance-id>
 
 # Stop and clean up
-instant-db stop a1b2c3d4e5f6
+instant-db stop <instance-id>
 ```
 
-## Usage
-
-### Start an instance
+## Commands
 
 ```bash
-# Interactive mode (prompts for username/password)
+# Start a new instance (interactive)
 instant-db start
 
-# Output:
-# Enter database username (default: postgres): myuser
-# Enter database password (default: postgres): mypass
-# 🚀 Starting PostgreSQL instance...
+# Start with flags (non-interactive)
+instant-db start -u myuser -password mypass --name myapp --port 5432 --persist
 
-# Non-interactive with flags
-instant-db start -u myuser -password mypass
+# Stop instance (removes data unless --persist was used)
+instant-db stop <instance-id>
 
-# With custom name
-instant-db start --name myapp -u admin -password secret
+# Pause instance (stops process, always keeps data)
+instant-db pause <instance-id>
 
-# With specific port
-instant-db start --port 5432 -u myuser -password mypass
+# Resume paused instance
+instant-db resume <instance-id>
 
-# Persistent data (survives stop)
-instant-db start --persist -u myuser -password mypass
-
-# All options
-instant-db start --name myapp --port 5432 -u admin -password secret --persist
-```
-
-### List instances
-
-```bash
+# List all instances
 instant-db list
 
-# Output:
-# 📋 Running Instances (2)
-# 
-#   • myapp
-#     ID:     a1b2c3d4e5f6...
-#     Port:   5432
-#     Status: running
-```
+# Get connection URL
+instant-db url <instance-id>
 
-### Get connection URL
+# Check instance status
+instant-db status <instance-id>
 
-```bash
-instant-db url a1b2c3d4e5f6
+# Show version
+instant-db --version
 
-# Output:
-# postgresql://localhost:5432/postgres
-```
-
-### Check status
-
-```bash
-instant-db status a1b2c3d4e5f6
-
-# Output:
-# 📊 Instance Status: a1b2c3d4e5f6
-# 
-#   Running:  ✅ Yes
-#   Healthy:  ✅ Yes
-#   Message:  ok
-```
-
-### Stop instance
-
-```bash
-instant-db stop a1b2c3d4e5f6
-
-# Output:
-# 🛑 Stopping instance a1b2c3d4e5f6...
-# ✅ Instance stopped successfully!
+# Show help
+instant-db --help
 ```
 
 ## Use Cases
@@ -150,7 +103,8 @@ instant-db stop <id>
 ```bash
 instant-db start --name feature-auth --persist
 # Develop your feature
-instant-db stop <id>
+instant-db pause <id>  # Free resources when not working
+instant-db resume <id> # Continue later
 ```
 
 ### Integration with Migrator
@@ -172,44 +126,22 @@ instant-db stop <id>
 
 ## How It Works
 
-1. **Isolated Data Directories** - Each instance gets its own data directory in `~/.instant-db/data/`
-2. **Auto Port Allocation** - Finds available ports automatically
-3. **Metadata Tracking** - Instance info stored in `~/.instant-db/*.json`
-4. **Clean Shutdown** - Graceful SIGTERM with fallback to SIGKILL
-5. **Zero Traces** - Non-persistent instances are completely removed on stop
-
-## Architecture
-
-```
-instant-db/
-├── cmd/instantdb/          # CLI commands
-│   ├── main.go            # Entry point
-│   └── commands/          # Modular commands
-├── internal/
-│   ├── engines/           # Database engines
-│   │   ├── engine.go      # Engine interface
-│   │   └── postgres.go    # PostgreSQL implementation
-│   ├── types/             # Shared types
-│   │   ├── config.go
-│   │   ├── instance.go
-│   │   └── status.go
-│   └── utils/             # Utilities
-│       ├── id.go          # ID generation
-│       ├── network.go     # Port allocation
-│       ├── process.go     # Process management
-│       └── storage.go     # Metadata storage
-```
+1. **Embedded PostgreSQL** - Binaries downloaded automatically on first use
+2. **Isolated Data Directories** - Each instance gets its own data directory in `~/.instant-db/data/`
+3. **Auto Port Allocation** - Finds available ports automatically
+4. **Metadata Tracking** - Instance info stored in `~/.instant-db/*.json`
+5. **Clean Shutdown** - Graceful process termination
+6. **Zero Traces** - Non-persistent instances are completely removed on stop
 
 ## Roadmap
 
 - [x] PostgreSQL support
+- [x] Pause/resume functionality
 - [ ] MySQL support
-- [ ] SQLite support
 - [ ] MongoDB support
 - [ ] Snapshot/restore functionality
 - [ ] Clone from existing database
 - [ ] Pre-load data from SQL file
-- [ ] Docker-free embedded binaries
 
 ## Contributing
 
