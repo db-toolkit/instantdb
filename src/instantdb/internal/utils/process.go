@@ -36,20 +36,28 @@ func KillProcessOnPort(port int) error {
 		return nil
 	}
 
-	pid, err := strconv.Atoi(pidStr)
-	if err != nil {
-		return fmt.Errorf("invalid PID: %w", err)
-	}
+	// Split by newlines in case multiple processes
+	pids := strings.Split(pidStr, "\n")
+	
+	for _, pidLine := range pids {
+		pidLine = strings.TrimSpace(pidLine)
+		if pidLine == "" {
+			continue
+		}
 
-	// Kill the process
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return fmt.Errorf("failed to find process: %w", err)
-	}
+		pid, err := strconv.Atoi(pidLine)
+		if err != nil {
+			continue // Skip invalid PIDs
+		}
 
-	// Send SIGTERM for graceful shutdown
-	if err := process.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to kill process: %w", err)
+		// Kill the process
+		process, err := os.FindProcess(pid)
+		if err != nil {
+			continue
+		}
+
+		// Send SIGTERM for graceful shutdown
+		process.Signal(syscall.SIGTERM)
 	}
 
 	return nil
