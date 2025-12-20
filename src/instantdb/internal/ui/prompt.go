@@ -55,7 +55,7 @@ func (m promptModel) View() string {
 	}
 	prompt += ": "
 
-	return "\n" + prompt + m.textInput.View()
+	return prompt + m.textInput.View()
 }
 
 // PromptString prompts the user for a string input
