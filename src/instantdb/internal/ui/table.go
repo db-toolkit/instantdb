@@ -28,6 +28,7 @@ func RenderInstanceTable(instances []*types.Instance) string {
 		}
 		
 		b.WriteString(SuccessStyle.Render(fmt.Sprintf("  • %s\n", instance.Name)))
+		b.WriteString(fmt.Sprintf("    Engine: %s\n", instance.Engine))
 		b.WriteString(fmt.Sprintf("    ID:     %s\n", instance.ID))
 		b.WriteString(fmt.Sprintf("    Port:   %d\n", instance.Port))
 		b.WriteString(fmt.Sprintf("    Status: %s\n", status))
