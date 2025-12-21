@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/types"
@@ -33,9 +34,22 @@ func NewRedisEngine(baseDir string) *RedisEngine {
 
 func (e *RedisEngine) downloadRedis() error {
 	version := "7.2.4"
-	url := fmt.Sprintf("https://download.redis.io/releases/redis-%s.tar.gz", version)
+	platform := "darwin-universal"
 	
-	tmpFile := filepath.Join(e.binaryDir, "redis.tar.gz")
+	if runtime.GOOS == "linux" {
+		platform = "linux-amd64"
+	} else if runtime.GOOS == "windows" {
+		platform = "windows-amd64"
+	}
+	
+	ext := ".tar.gz"
+	if runtime.GOOS == "windows" {
+		ext = ".zip"
+	}
+	
+	url := fmt.Sprintf("https://github.com/db-toolkit/instant-db/releases/download/binaries-v1.0.0/redis-%s-%s%s", version, platform, ext)
+	
+	tmpFile := filepath.Join(e.binaryDir, "redis"+ext)
 	
 	resp, err := http.Get(url)
 	if err != nil {
@@ -54,64 +68,43 @@ func (e *RedisEngine) downloadRedis() error {
 	}
 
 	// Extract
-	file, err := os.Open(tmpFile)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	gzr, err := gzip.NewReader(file)
-	if err != nil {
-		return err
-	}
-	defer gzr.Close()
-
-	tr := tar.NewReader(gzr)
-	extractDir := filepath.Join(e.binaryDir, fmt.Sprintf("redis-%s", version))
-	
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
+	if runtime.GOOS == "windows" {
+		// TODO: Extract zip
+		return fmt.Errorf("windows not yet supported")
+	} else {
+		file, err := os.Open(tmpFile)
+		if err != nil {
+			return err
 		}
+		defer file.Close()
+
+		gzr, err := gzip.NewReader(file)
+		if err != nil {
+			return err
+		}
+		defer gzr.Close()
+
+		tr := tar.NewReader(gzr)
+		header, err := tr.Next()
 		if err != nil {
 			return err
 		}
 
-		target := filepath.Join(e.binaryDir, header.Name)
-		
-		switch header.Typeflag {
-		case tar.TypeDir:
-			os.MkdirAll(target, 0755)
-		case tar.TypeReg:
-			os.MkdirAll(filepath.Dir(target), 0755)
-			outFile, err := os.Create(target)
-			if err != nil {
-				return err
-			}
-			io.Copy(outFile, tr)
-			outFile.Close()
-			os.Chmod(target, os.FileMode(header.Mode))
+		redisBinary := filepath.Join(e.binaryDir, "redis-server")
+		outFile, err := os.Create(redisBinary)
+		if err != nil {
+			return err
 		}
+		defer outFile.Close()
+
+		if _, err := io.Copy(outFile, tr); err != nil {
+			return err
+		}
+
+		os.Chmod(redisBinary, 0755)
 	}
 
-	// Compile Redis
-	cmd := exec.Command("make", "-j4")
-	cmd.Dir = extractDir
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to compile redis: %w", err)
-	}
-
-	// Copy binary
-	srcBinary := filepath.Join(extractDir, "src", "redis-server")
-	dstBinary := filepath.Join(e.binaryDir, "redis-server")
-	
-	input, _ := os.ReadFile(srcBinary)
-	os.WriteFile(dstBinary, input, 0755)
-	
 	os.Remove(tmpFile)
-	os.RemoveAll(extractDir)
-
 	return nil
 }
 
@@ -123,11 +116,6 @@ func (e *RedisEngine) ensureRedis() (string, error) {
 	}
 
 	os.MkdirAll(e.binaryDir, 0755)
-
-	// Check if make is available
-	if _, err := exec.LookPath("make"); err != nil {
-		return "", fmt.Errorf("'make' not found. Redis requires compilation. Install build tools or use system Redis")
-	}
 
 	fmt.Println("📦 Downloading Redis binaries (first time only)...")
 	if err := e.downloadRedis(); err != nil {

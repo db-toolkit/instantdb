@@ -1,30 +1,127 @@
 package engines
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
+	"runtime"
 	"time"
 
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/types"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
+	"github.com/redis/go-redis/v9"
 )
 
 type MySQLEngine struct {
-	baseDir    string
-	daemonPath string
+	baseDir   string
+	binaryDir string
 }
 
 func NewMySQLEngine(baseDir string) *MySQLEngine {
-	execPath, _ := os.Executable()
-	daemonPath := filepath.Join(filepath.Dir(execPath), "mysql-daemon")
+	homeDir, _ := os.UserHomeDir()
+	binaryDir := filepath.Join(homeDir, ".instant-db-mysql")
 	return &MySQLEngine{
-		baseDir:    baseDir,
-		daemonPath: daemonPath,
+		baseDir:   baseDir,
+		binaryDir: binaryDir,
 	}
+}
+
+func (e *MySQLEngine) downloadMySQL() error {
+	version := "8.0.35"
+	platform := "darwin-universal"
+	
+	if runtime.GOOS == "linux" {
+		platform = "linux-amd64"
+	} else if runtime.GOOS == "windows" {
+		platform = "windows-amd64"
+	}
+	
+	ext := ".tar.gz"
+	if runtime.GOOS == "windows" {
+		ext = ".zip"
+	}
+	
+	url := fmt.Sprintf("https://github.com/db-toolkit/instant-db/releases/download/binaries-v1.0.0/mysql-%s-%s%s", version, platform, ext)
+	
+	tmpFile := filepath.Join(e.binaryDir, "mysql"+ext)
+	
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download mysql: %w", err)
+	}
+	defer resp.Body.Close()
+
+	out, err := os.Create(tmpFile)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		return err
+	}
+
+	// Extract
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("windows not yet supported")
+	} else {
+		file, err := os.Open(tmpFile)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		gzr, err := gzip.NewReader(file)
+		if err != nil {
+			return err
+		}
+		defer gzr.Close()
+
+		tr := tar.NewReader(gzr)
+		header, err := tr.Next()
+		if err != nil {
+			return err
+		}
+
+		mysqlBinary := filepath.Join(e.binaryDir, "mysqld")
+		outFile, err := os.Create(mysqlBinary)
+		if err != nil {
+			return err
+		}
+		defer outFile.Close()
+
+		if _, err := io.Copy(outFile, tr); err != nil {
+			return err
+		}
+
+		os.Chmod(mysqlBinary, 0755)
+	}
+
+	os.Remove(tmpFile)
+	return nil
+}
+
+func (e *MySQLEngine) ensureMySQL() (string, error) {
+	mysqlBinary := filepath.Join(e.binaryDir, "mysqld")
+	
+	if _, err := os.Stat(mysqlBinary); err == nil {
+		return mysqlBinary, nil
+	}
+
+	os.MkdirAll(e.binaryDir, 0755)
+
+	fmt.Println("📦 Downloading MySQL binaries (first time only)...")
+	if err := e.downloadMySQL(); err != nil {
+		return "", fmt.Errorf("failed to setup mysql: %w", err)
+	}
+
+	return mysqlBinary, nil
 }
 
 func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.Instance, error) {
@@ -54,16 +151,36 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	cmd := exec.Command(e.daemonPath, strconv.Itoa(config.Port))
-	cmd.Stdout = nil
-	cmd.Stderr = nil
+	mysqlBinary, err := e.ensureMySQL()
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize MySQL data directory
+	initCmd := exec.Command(mysqlBinary, "--initialize-insecure", "--datadir="+config.DataDir)
+	if err := initCmd.Run(); err != nil {
+		os.RemoveAll(config.DataDir)
+		return nil, fmt.Errorf("failed to initialize mysql: %w", err)
+	}
+
+	// Start MySQL
+	cmd := exec.Command(mysqlBinary,
+		"--datadir="+config.DataDir,
+		"--port="+fmt.Sprintf("%d", config.Port),
+		"--bind-address=127.0.0.1",
+	)
+	
+	logFile := filepath.Join(config.DataDir, "mysql.log")
+	logFd, _ := os.Create(logFile)
+	cmd.Stdout = logFd
+	cmd.Stderr = logFd
 	
 	if err := cmd.Start(); err != nil {
 		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("failed to start daemon: %w", err)
+		return nil, fmt.Errorf("failed to start mysql: %w", err)
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 
 	instance := &types.Instance{
 		ID:        instanceID,
@@ -124,15 +241,27 @@ func (e *MySQLEngine) Resume(ctx context.Context, instanceID string) error {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	cmd := exec.Command(e.daemonPath, strconv.Itoa(instance.Port))
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start daemon: %w", err)
+	mysqlBinary, err := e.ensureMySQL()
+	if err != nil {
+		return err
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	cmd := exec.Command(mysqlBinary,
+		"--datadir="+instance.DataDir,
+		"--port="+fmt.Sprintf("%d", instance.Port),
+		"--bind-address=127.0.0.1",
+	)
+	
+	logFile := filepath.Join(instance.DataDir, "mysql.log")
+	logFd, _ := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	cmd.Stdout = logFd
+	cmd.Stderr = logFd
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start mysql: %w", err)
+	}
+
+	time.Sleep(2 * time.Second)
 
 	instance.PID = cmd.Process.Pid
 	instance.Status = "running"

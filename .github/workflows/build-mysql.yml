@@ -1,0 +1,72 @@
+name: Build MySQL Binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'binaries-*'
+
+jobs:
+  build:
+    name: Build MySQL ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: mysql-8.0.35-darwin-universal.tar.gz
+          - os: ubuntu-latest
+            artifact: mysql-8.0.35-linux-amd64.tar.gz
+          - os: windows-latest
+            artifact: mysql-8.0.35-windows-amd64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download MySQL (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-macos13-arm64.tar.gz -o mysql-arm64.tar.gz
+          curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-macos13-x86_64.tar.gz -o mysql-x86_64.tar.gz
+          tar xzf mysql-arm64.tar.gz
+          tar xzf mysql-x86_64.tar.gz
+          lipo -create mysql-8.0.35-macos13-arm64/bin/mysqld mysql-8.0.35-macos13-x86_64/bin/mysqld -output mysqld
+          tar czf mysql-8.0.35-darwin-universal.tar.gz mysqld
+
+      - name: Download MySQL (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-linux-glibc2.28-x86_64.tar.gz -o mysql.tar.gz
+          tar xzf mysql.tar.gz
+          tar czf mysql-8.0.35-linux-amd64.tar.gz -C mysql-8.0.35-linux-glibc2.28-x86_64/bin mysqld
+
+      - name: Download MySQL (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-winx64.zip -o mysql.zip
+          7z x mysql.zip
+          7z a mysql-8.0.35-windows-amd64.zip mysql-8.0.35-winx64/bin/mysqld.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/binaries-')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: binaries
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: binaries/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
