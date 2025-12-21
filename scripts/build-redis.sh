@@ -2,11 +2,9 @@
 set -e
 
 VERSION="7.2.4"
-PLATFORMS=("darwin-arm64" "darwin-amd64" "linux-amd64")
 
-echo "🔨 Building Redis binaries for all platforms..."
+echo "🔨 Building Redis ${VERSION} for all platforms..."
 
-# Create build directory
 BUILD_DIR="$(pwd)/build/redis"
 mkdir -p "$BUILD_DIR"
 
@@ -17,42 +15,34 @@ curl -L "https://download.redis.io/releases/redis-${VERSION}.tar.gz" -o redis.ta
 tar xzf redis.tar.gz
 cd "redis-${VERSION}"
 
-# Build for current platform
-echo "🔨 Compiling Redis..."
-make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
-
-# Package binaries
-echo "📦 Packaging binaries..."
 BINARIES_DIR="$BUILD_DIR/binaries"
 mkdir -p "$BINARIES_DIR"
 
-# Detect current platform
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-
-if [ "$OS" = "darwin" ]; then
-    if [ "$ARCH" = "arm64" ]; then
-        PLATFORM="darwin-arm64"
-    else
-        PLATFORM="darwin-amd64"
-    fi
-elif [ "$OS" = "linux" ]; then
-    PLATFORM="linux-amd64"
-else
-    echo "❌ Unsupported platform: $OS-$ARCH"
-    exit 1
+# Build for macOS (universal binary)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "🍎 Building macOS universal binary..."
+    make clean
+    make -j$(sysctl -n hw.ncpu) CFLAGS="-arch arm64 -arch x86_64" LDFLAGS="-arch arm64 -arch x86_64"
+    
+    tar czf "$BINARIES_DIR/redis-${VERSION}-darwin-universal.tar.gz" -C src redis-server
+    echo "✅ Built: redis-${VERSION}-darwin-universal.tar.gz"
+    
+    # Verify it's universal
+    file src/redis-server
 fi
 
-# Create tarball with just redis-server
-echo "📦 Creating redis-${VERSION}-${PLATFORM}.tar.gz..."
-tar czf "$BINARIES_DIR/redis-${VERSION}-${PLATFORM}.tar.gz" -C src redis-server
+# Build for Linux (requires Docker or Linux machine)
+echo ""
+echo "🐧 To build for Linux, run on a Linux machine or use Docker:"
+echo "   docker run --rm -v \$(pwd):/work -w /work/redis-${VERSION} ubuntu:22.04 bash -c 'apt-get update && apt-get install -y build-essential && make -j\$(nproc) && tar czf /work/binaries/redis-${VERSION}-linux-amd64.tar.gz -C src redis-server'"
 
-echo "✅ Built: redis-${VERSION}-${PLATFORM}.tar.gz"
-echo "📍 Location: $BINARIES_DIR/redis-${VERSION}-${PLATFORM}.tar.gz"
+# Build for Windows (requires cross-compilation or Windows machine)
 echo ""
-echo "📤 Upload this file to GitHub Releases:"
+echo "🪟 To build for Windows, use WSL or cross-compile with MinGW"
+
+echo ""
+echo "📍 Binaries location: $BINARIES_DIR"
+echo ""
+echo "📤 Upload to GitHub Releases:"
 echo "   https://github.com/db-toolkit/instant-db/releases"
-echo ""
-echo "💡 Or test locally:"
-echo "   tar xzf $BINARIES_DIR/redis-${VERSION}-${PLATFORM}.tar.gz"
-echo "   ./redis-server --version"
+
