@@ -4,26 +4,26 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"time"
 
-	"github.com/dolthub/go-mysql-server/memory"
-	"github.com/dolthub/go-mysql-server/server"
-	"github.com/dolthub/go-mysql-server/sql/information_schema"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/types"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
-	sqle "github.com/dolthub/go-mysql-server"
 )
 
 type MySQLEngine struct {
-	baseDir   string
-	instances map[string]*server.Server
+	baseDir    string
+	daemonPath string
 }
 
 func NewMySQLEngine(baseDir string) *MySQLEngine {
+	execPath, _ := os.Executable()
+	daemonPath := filepath.Join(filepath.Dir(execPath), "mysql-daemon")
 	return &MySQLEngine{
-		baseDir:   baseDir,
-		instances: make(map[string]*server.Server),
+		baseDir:    baseDir,
+		daemonPath: daemonPath,
 	}
 }
 
@@ -54,29 +54,16 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	db := memory.NewDatabase("mysql")
-	pro := memory.NewDBProvider(db)
-	engine := sqle.NewDefault(pro)
-	engine.Analyzer.Catalog.InfoSchema = information_schema.NewInformationSchemaDatabase()
+	cmd := exec.Command(e.daemonPath, strconv.Itoa(config.Port))
+	cmd.Stdout = nil
+	cmd.Stderr = nil
 	
-	serverConfig := server.Config{
-		Protocol: "tcp",
-		Address:  fmt.Sprintf("127.0.0.1:%d", config.Port),
-	}
-	
-	s, err := server.NewServer(serverConfig, engine, nil, memory.NewSessionBuilder(pro), nil)
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("failed to create server: %w", err)
+		return nil, fmt.Errorf("failed to start daemon: %w", err)
 	}
-
-	go func() {
-		s.Start()
-	}()
 
 	time.Sleep(500 * time.Millisecond)
-
-	e.instances[instanceID] = s
 
 	instance := &types.Instance{
 		ID:        instanceID,
@@ -84,7 +71,7 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		Engine:    "mysql",
 		Port:      config.Port,
 		DataDir:   config.DataDir,
-		PID:       0,
+		PID:       cmd.Process.Pid,
 		Status:    "running",
 		CreatedAt: time.Now().Unix(),
 		Persist:   config.Persist,
@@ -93,7 +80,7 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 	}
 
 	if err := utils.SaveInstance(instance); err != nil {
-		s.Close()
+		utils.KillProcessOnPort(config.Port)
 		os.RemoveAll(config.DataDir)
 		return nil, fmt.Errorf("failed to save instance: %w", err)
 	}
@@ -107,10 +94,7 @@ func (e *MySQLEngine) Stop(ctx context.Context, instanceID string) error {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	if s, ok := e.instances[instanceID]; ok {
-		s.Close()
-		delete(e.instances, instanceID)
-	}
+	utils.KillProcessOnPort(instance.Port)
 
 	if !instance.Persist {
 		os.RemoveAll(instance.DataDir)
@@ -127,10 +111,7 @@ func (e *MySQLEngine) Pause(ctx context.Context, instanceID string) error {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	if s, ok := e.instances[instanceID]; ok {
-		s.Close()
-		delete(e.instances, instanceID)
-	}
+	utils.KillProcessOnPort(instance.Port)
 
 	instance.Status = "paused"
 	instance.Paused = true
@@ -143,29 +124,17 @@ func (e *MySQLEngine) Resume(ctx context.Context, instanceID string) error {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	engine := memory.NewDatabase("mysql")
-	pro := memory.NewDBProvider(engine)
-	eng := sqle.NewDefault(pro)
-	eng.Analyzer.Catalog.InfoSchema = information_schema.NewInformationSchemaDatabase()
+	cmd := exec.Command(e.daemonPath, strconv.Itoa(instance.Port))
+	cmd.Stdout = nil
+	cmd.Stderr = nil
 	
-	serverConfig := server.Config{
-		Protocol: "tcp",
-		Address:  fmt.Sprintf("127.0.0.1:%d", instance.Port),
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start daemon: %w", err)
 	}
-	
-	s, err := server.NewServer(serverConfig, eng, nil, memory.NewSessionBuilder(pro), nil)
-	if err != nil {
-		return fmt.Errorf("failed to create server: %w", err)
-	}
-
-	go func() {
-		s.Start()
-	}()
 
 	time.Sleep(500 * time.Millisecond)
 
-	e.instances[instanceID] = s
-
+	instance.PID = cmd.Process.Pid
 	instance.Status = "running"
 	instance.Paused = false
 	return utils.SaveInstance(instance)
@@ -211,3 +180,4 @@ func (e *MySQLEngine) List() ([]*types.Instance, error) {
 	}
 	return mysql, nil
 }
+
