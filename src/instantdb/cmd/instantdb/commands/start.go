@@ -32,7 +32,7 @@ func StartCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&startPersist, "persist", false, "Keep data after stop")
 	cmd.Flags().StringVarP(&startUsername, "username", "u", "", "Database username")
 	cmd.Flags().StringVar(&startPassword, "password", "", "Database password")
-	cmd.Flags().StringVarP(&startEngine, "engine", "e", "", "Database engine (postgres, mysql)")
+	cmd.Flags().StringVarP(&startEngine, "engine", "e", "", "Database engine (postgres, mysql, redis)")
 
 	return cmd
 }
@@ -42,12 +42,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	// Prompt for engine if not provided
 	if startEngine == "" {
-		startEngine = ui.PromptSelect("Select database engine", []string{"postgres", "mysql"})
+		startEngine = ui.PromptSelect("Select database engine", []string{"postgres", "mysql", "redis"})
 	}
 
 	// Validate engine
-	if startEngine != "postgres" && startEngine != "mysql" {
-		return fmt.Errorf("unsupported engine: %s (supported: postgres, mysql)", startEngine)
+	if startEngine != "postgres" && startEngine != "mysql" && startEngine != "redis" {
+		return fmt.Errorf("unsupported engine: %s (supported: postgres, mysql, redis)", startEngine)
 	}
 
 	// Prompt for username if not provided
@@ -55,6 +55,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		defaultUser := "postgres"
 		if startEngine == "mysql" {
 			defaultUser = "root"
+		} else if startEngine == "redis" {
+			defaultUser = "default"
 		}
 		startUsername = ui.PromptString("Enter database username", defaultUser)
 	}
@@ -64,6 +66,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		defaultPass := "postgres"
 		if startEngine == "mysql" {
 			defaultPass = "password"
+		} else if startEngine == "redis" {
+			defaultPass = ""
 		}
 		startPassword = ui.PromptPassword("Enter database password", defaultPass)
 	}
@@ -84,6 +88,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		var err error
 		if startEngine == "mysql" {
 			instance, err = MySQLEngine.Start(ctx, config)
+		} else if startEngine == "redis" {
+			instance, err = RedisEngine.Start(ctx, config)
 		} else {
 			instance, err = Engine.Start(ctx, config)
 		}

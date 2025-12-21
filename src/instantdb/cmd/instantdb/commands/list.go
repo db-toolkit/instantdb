@@ -18,12 +18,14 @@ func ListCmd() *cobra.Command {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	// Get all instances from both engines
+	// Get all instances from all engines
 	postgresInstances, _ := Engine.List()
 	mysqlInstances, _ := MySQLEngine.List()
+	redisInstances, _ := RedisEngine.List()
 	
 	// Combine all instances
 	allInstances := append(postgresInstances, mysqlInstances...)
+	allInstances = append(allInstances, redisInstances...)
 
 	fmt.Println(ui.RenderInstanceTable(allInstances))
 

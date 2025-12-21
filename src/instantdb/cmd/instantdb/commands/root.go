@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	Engine      engines.Engine
-	MySQLEngine engines.Engine
+	Engine       engines.Engine
+	MySQLEngine  engines.Engine
+	RedisEngine  engines.Engine
 )
 
 // InitEngine initializes the database engines
@@ -21,6 +22,7 @@ func InitEngine() {
 	
 	Engine = engines.NewPostgresEngine(baseDir)
 	MySQLEngine = engines.NewMySQLEngine(baseDir)
+	RedisEngine = engines.NewRedisEngine(baseDir)
 }
 
 // GetEngineForInstance returns the appropriate engine for an instance
@@ -35,6 +37,8 @@ func GetEngineForInstance(instanceID string) (engines.Engine, error) {
 		return MySQLEngine, nil
 	case "postgres":
 		return Engine, nil
+	case "redis":
+		return RedisEngine, nil
 	default:
 		return nil, fmt.Errorf("unknown engine: %s", instance.Engine)
 	}
