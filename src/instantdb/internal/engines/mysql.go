@@ -15,7 +15,6 @@ import (
 
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/types"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
-	"github.com/redis/go-redis/v9"
 )
 
 type MySQLEngine struct {
@@ -84,7 +83,7 @@ func (e *MySQLEngine) downloadMySQL() error {
 		defer gzr.Close()
 
 		tr := tar.NewReader(gzr)
-		header, err := tr.Next()
+		_, err = tr.Next()
 		if err != nil {
 			return err
 		}

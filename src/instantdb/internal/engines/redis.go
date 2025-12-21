@@ -85,7 +85,7 @@ func (e *RedisEngine) downloadRedis() error {
 		defer gzr.Close()
 
 		tr := tar.NewReader(gzr)
-		header, err := tr.Next()
+		_, err = tr.Next()
 		if err != nil {
 			return err
 		}

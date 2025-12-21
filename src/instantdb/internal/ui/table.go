@@ -67,6 +67,9 @@ func RenderInstanceDetails(instance *types.Instance) string {
 	if instance.Engine == "redis" && instance.Password != "" {
 		b.WriteString(fmt.Sprintf("  Connection String: %s://:%s@localhost:%d%s\n\n", 
 			connScheme, instance.Password, instance.Port, connDB))
+	} else if instance.Engine == "redis" {
+		b.WriteString(fmt.Sprintf("  Connection String: %s://localhost:%d%s\n\n", 
+			connScheme, instance.Port, connDB))
 	} else {
 		b.WriteString(fmt.Sprintf("  Connection String: %s://%s:%s@localhost:%d%s\n\n", 
 			connScheme, instance.Username, instance.Password, instance.Port, connDB))
