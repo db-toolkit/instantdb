@@ -1,0 +1,73 @@
+name: Build Redis Binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'binaries-*'
+
+jobs:
+  build:
+    name: Build Redis ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: redis-7.2.4-darwin-universal.tar.gz
+          - os: ubuntu-latest
+            artifact: redis-7.2.4-linux-amd64.tar.gz
+          - os: windows-latest
+            artifact: redis-7.2.4-windows-amd64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Redis (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          curl -L https://download.redis.io/releases/redis-7.2.4.tar.gz -o redis.tar.gz
+          tar xzf redis.tar.gz
+          cd redis-7.2.4
+          make -j$(sysctl -n hw.ncpu) CFLAGS="-arch arm64 -arch x86_64" LDFLAGS="-arch arm64 -arch x86_64"
+          tar czf ../redis-7.2.4-darwin-universal.tar.gz -C src redis-server
+
+      - name: Build Redis (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          curl -L https://download.redis.io/releases/redis-7.2.4.tar.gz -o redis.tar.gz
+          tar xzf redis.tar.gz
+          cd redis-7.2.4
+          make -j$(nproc)
+          tar czf ../redis-7.2.4-linux-amd64.tar.gz -C src redis-server
+
+      - name: Build Redis (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          curl -L https://github.com/tporadowski/redis/releases/download/v5.0.14.1/Redis-x64-5.0.14.1.zip -o redis.zip
+          7z x redis.zip
+          7z a redis-7.2.4-windows-amd64.zip redis-server.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/binaries-')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: binaries
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: binaries/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
