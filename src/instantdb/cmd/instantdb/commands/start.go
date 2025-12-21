@@ -43,6 +43,11 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Prompt for engine if not provided
 	if startEngine == "" {
 		startEngine = ui.PromptSelect("Select database engine", []string{"postgres", "mysql", "redis"})
+		
+		// Prompt for name in interactive mode
+		if startName == "" {
+			startName = ui.PromptString("Enter instance name (optional)", "")
+		}
 	}
 
 	// Validate engine
