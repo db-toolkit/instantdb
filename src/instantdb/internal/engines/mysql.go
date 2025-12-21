@@ -4,32 +4,32 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
+	"github.com/dolthub/go-mysql-server/memory"
+	"github.com/dolthub/go-mysql-server/server"
+	"github.com/dolthub/go-mysql-server/sql/information_schema"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/types"
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
+	sqle "github.com/dolthub/go-mysql-server"
 )
 
-// MySQLEngine implements the Engine interface for MySQL
 type MySQLEngine struct {
-	baseDir string
+	baseDir   string
+	instances map[string]*server.Server
 }
 
-// NewMySQLEngine creates a new MySQL engine
 func NewMySQLEngine(baseDir string) *MySQLEngine {
 	return &MySQLEngine{
-		baseDir: baseDir,
+		baseDir:   baseDir,
+		instances: make(map[string]*server.Server),
 	}
 }
 
-// Start starts a new MySQL instance
 func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.Instance, error) {
-	// Generate instance ID
 	instanceID := utils.GenerateID()
 	
-	// Set defaults
 	if config.Name == "" {
 		config.Name = fmt.Sprintf("mysql-%s", instanceID[:8])
 	}
@@ -50,39 +50,41 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		config.Password = "password"
 	}
 
-	// Create data directory
 	if err := os.MkdirAll(config.DataDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	// Initialize MySQL data directory
-	if err := e.initDB(ctx, config.DataDir); err != nil {
-		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	db := memory.NewDatabase("mysql")
+	pro := memory.NewDBProvider(db)
+	engine := sqle.NewDefault(pro)
+	engine.Analyzer.Catalog.InfoSchema = information_schema.NewInformationSchemaDatabase()
+	
+	serverConfig := server.Config{
+		Protocol: "tcp",
+		Address:  fmt.Sprintf("127.0.0.1:%d", config.Port),
 	}
-
-	// Start MySQL server
-	pid, err := e.startServer(ctx, config.DataDir, config.Port, config.Password)
+	
+	s, err := server.NewServer(serverConfig, engine, nil, memory.NewSessionBuilder(pro), nil)
 	if err != nil {
 		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("failed to start server: %w", err)
+		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
 
-	// Wait for server to be ready
-	if err := e.waitForReady(ctx, config.Port); err != nil {
-		utils.KillProcessOnPort(config.Port)
-		os.RemoveAll(config.DataDir)
-		return nil, fmt.Errorf("server failed to become ready: %w", err)
-	}
+	go func() {
+		s.Start()
+	}()
 
-	// Create instance
+	time.Sleep(500 * time.Millisecond)
+
+	e.instances[instanceID] = s
+
 	instance := &types.Instance{
 		ID:        instanceID,
 		Name:      config.Name,
 		Engine:    "mysql",
 		Port:      config.Port,
 		DataDir:   config.DataDir,
-		PID:       pid,
+		PID:       0,
 		Status:    "running",
 		CreatedAt: time.Now().Unix(),
 		Persist:   config.Persist,
@@ -90,9 +92,8 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		Password:  config.Password,
 	}
 
-	// Save instance metadata
 	if err := utils.SaveInstance(instance); err != nil {
-		utils.KillProcessOnPort(config.Port)
+		s.Close()
 		os.RemoveAll(config.DataDir)
 		return nil, fmt.Errorf("failed to save instance: %w", err)
 	}
@@ -100,212 +101,113 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 	return instance, nil
 }
 
-// Stop stops a running MySQL instance
 func (e *MySQLEngine) Stop(ctx context.Context, instanceID string) error {
 	instance, err := utils.LoadInstance(instanceID)
 	if err != nil {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	// Kill the MySQL process
-	if err := utils.KillProcessOnPort(instance.Port); err != nil {
-		return fmt.Errorf("failed to stop server: %w", err)
+	if s, ok := e.instances[instanceID]; ok {
+		s.Close()
+		delete(e.instances, instanceID)
 	}
 
-	// Clean up data directory if not persistent
 	if !instance.Persist {
-		if err := os.RemoveAll(instance.DataDir); err != nil {
-			return fmt.Errorf("failed to remove data directory: %w", err)
-		}
+		os.RemoveAll(instance.DataDir)
 	}
 
-	// Remove instance metadata
-	if err := utils.RemoveInstance(instanceID); err != nil {
-		return fmt.Errorf("failed to remove instance metadata: %w", err)
-	}
-
+	metaFile := filepath.Join(os.Getenv("HOME"), ".instant-db", instanceID+".json")
+	os.Remove(metaFile)
 	return nil
 }
 
-// Pause pauses a running MySQL instance
 func (e *MySQLEngine) Pause(ctx context.Context, instanceID string) error {
 	instance, err := utils.LoadInstance(instanceID)
 	if err != nil {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	if instance.Paused {
-		return fmt.Errorf("instance is already paused")
+	if s, ok := e.instances[instanceID]; ok {
+		s.Close()
+		delete(e.instances, instanceID)
 	}
 
-	// Kill the MySQL process
-	if err := utils.KillProcessOnPort(instance.Port); err != nil {
-		return fmt.Errorf("failed to stop server: %w", err)
-	}
-
-	// Mark as paused and save
-	instance.Paused = true
 	instance.Status = "paused"
-	if err := utils.SaveInstance(instance); err != nil {
-		return fmt.Errorf("failed to save instance: %w", err)
-	}
-
-	return nil
+	instance.Paused = true
+	return utils.SaveInstance(instance)
 }
 
-// Resume resumes a paused MySQL instance
 func (e *MySQLEngine) Resume(ctx context.Context, instanceID string) error {
 	instance, err := utils.LoadInstance(instanceID)
 	if err != nil {
 		return fmt.Errorf("instance not found: %w", err)
 	}
 
-	if !instance.Paused {
-		return fmt.Errorf("instance is not paused")
+	engine := memory.NewDatabase("mysql")
+	pro := memory.NewDBProvider(engine)
+	eng := sqle.NewDefault(pro)
+	eng.Analyzer.Catalog.InfoSchema = information_schema.NewInformationSchemaDatabase()
+	
+	serverConfig := server.Config{
+		Protocol: "tcp",
+		Address:  fmt.Sprintf("127.0.0.1:%d", instance.Port),
 	}
-
-	// Start MySQL server
-	pid, err := e.startServer(ctx, instance.DataDir, instance.Port, instance.Password)
+	
+	s, err := server.NewServer(serverConfig, eng, nil, memory.NewSessionBuilder(pro), nil)
 	if err != nil {
-		return fmt.Errorf("failed to resume server: %w", err)
+		return fmt.Errorf("failed to create server: %w", err)
 	}
 
-	// Wait for server to be ready
-	if err := e.waitForReady(ctx, instance.Port); err != nil {
-		utils.KillProcessOnPort(instance.Port)
-		return fmt.Errorf("server failed to become ready: %w", err)
-	}
+	go func() {
+		s.Start()
+	}()
 
-	// Mark as running and save
-	instance.Paused = false
+	time.Sleep(500 * time.Millisecond)
+
+	e.instances[instanceID] = s
+
 	instance.Status = "running"
-	instance.PID = pid
-	if err := utils.SaveInstance(instance); err != nil {
-		utils.KillProcessOnPort(instance.Port)
-		return fmt.Errorf("failed to save instance: %w", err)
-	}
-
-	return nil
+	instance.Paused = false
+	return utils.SaveInstance(instance)
 }
 
-// Status returns the status of a MySQL instance
-func (e *MySQLEngine) Status(ctx context.Context, instanceID string) (*types.Status, error) {
+func (e *MySQLEngine) GetStatus(ctx context.Context, instanceID string) (string, error) {
 	instance, err := utils.LoadInstance(instanceID)
 	if err != nil {
-		return &types.Status{
-			Running: false,
-			Healthy: false,
-			Message: "instance not found",
-		}, nil
+		return "", fmt.Errorf("instance not found: %w", err)
 	}
-
-	// Check if data directory exists
-	if _, err := os.Stat(instance.DataDir); os.IsNotExist(err) {
-		return &types.Status{
-			Running: false,
-			Healthy: false,
-			Message: "data directory not found",
-		}, nil
-	}
-
-	// Check if process is running
-	running := utils.IsProcessRunning(instance.PID)
-	
-	return &types.Status{
-		Running: running,
-		Healthy: running,
-		Message: "ok",
-	}, nil
+	return instance.Status, nil
 }
 
-// GetConnectionURL returns the connection URL for an instance
 func (e *MySQLEngine) GetConnectionURL(instanceID string) (string, error) {
 	instance, err := utils.LoadInstance(instanceID)
 	if err != nil {
 		return "", fmt.Errorf("instance not found: %w", err)
 	}
-
-	return fmt.Sprintf("mysql://%s:%s@localhost:%d/mysql", 
-		instance.Username, instance.Password, instance.Port), nil
+	return fmt.Sprintf("mysql://%s:%s@127.0.0.1:%d/mysql", instance.Username, instance.Password, instance.Port), nil
 }
 
-// List returns all running MySQL instances
+func (e *MySQLEngine) Status(ctx context.Context, instanceID string) (*types.Status, error) {
+	instance, err := utils.LoadInstance(instanceID)
+	if err != nil {
+		return nil, fmt.Errorf("instance not found: %w", err)
+	}
+	return &types.Status{
+		Running: instance.Status == "running",
+		Message: instance.Status,
+	}, nil
+}
+
 func (e *MySQLEngine) List() ([]*types.Instance, error) {
-	instances, err := utils.ListInstances()
+	all, err := utils.ListInstances()
 	if err != nil {
 		return nil, err
 	}
-
-	// Filter for mysql instances
-	var mysqlInstances []*types.Instance
-	for _, instance := range instances {
-		if instance.Engine == "mysql" {
-			mysqlInstances = append(mysqlInstances, instance)
+	var mysql []*types.Instance
+	for _, inst := range all {
+		if inst.Engine == "mysql" {
+			mysql = append(mysql, inst)
 		}
 	}
-
-	return mysqlInstances, nil
-}
-
-// initDB initializes a MySQL data directory
-func (e *MySQLEngine) initDB(ctx context.Context, dataDir string) error {
-	cmd := exec.CommandContext(ctx, "mysqld", "--initialize-insecure", "--datadir="+dataDir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("mysqld --initialize failed: %w", err)
-	}
-	
-	return nil
-}
-
-// startServer starts the MySQL server
-func (e *MySQLEngine) startServer(ctx context.Context, dataDir string, port int, password string) (int, error) {
-	cmd := exec.CommandContext(
-		ctx,
-		"mysqld",
-		"--datadir="+dataDir,
-		"--port="+fmt.Sprintf("%d", port),
-		"--socket="+filepath.Join(dataDir, "mysql.sock"),
-		"--pid-file="+filepath.Join(dataDir, "mysql.pid"),
-	)
-	
-	// Redirect output to log file
-	logFile := filepath.Join(dataDir, "mysql.log")
-	f, err := os.Create(logFile)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create log file: %w", err)
-	}
-	defer f.Close()
-	
-	cmd.Stdout = f
-	cmd.Stderr = f
-	
-	if err := cmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to start mysqld: %w", err)
-	}
-	
-	return cmd.Process.Pid, nil
-}
-
-// waitForReady waits for MySQL to be ready to accept connections
-func (e *MySQLEngine) waitForReady(ctx context.Context, port int) error {
-	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for server to be ready")
-		case <-ticker.C:
-			cmd := exec.CommandContext(ctx, "mysqladmin", "ping", "-P", fmt.Sprintf("%d", port), "-h", "127.0.0.1")
-			if cmd.Run() == nil {
-				return nil
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
+	return mysql, nil
 }
