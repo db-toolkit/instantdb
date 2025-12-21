@@ -26,18 +26,18 @@ jobs:
       - name: Download MySQL (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-macos13-arm64.tar.gz -o mysql-arm64.tar.gz
-          curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-macos13-x86_64.tar.gz -o mysql-x86_64.tar.gz
-          tar xzf mysql-arm64.tar.gz
-          tar xzf mysql-x86_64.tar.gz
+          wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-macos13-arm64.tar.gz
+          wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-macos13-x86_64.tar.gz
+          tar xzf mysql-8.0.35-macos13-arm64.tar.gz
+          tar xzf mysql-8.0.35-macos13-x86_64.tar.gz
           lipo -create mysql-8.0.35-macos13-arm64/bin/mysqld mysql-8.0.35-macos13-x86_64/bin/mysqld -output mysqld
           tar czf mysql-8.0.35-darwin-universal.tar.gz mysqld
 
       - name: Download MySQL (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-linux-glibc2.28-x86_64.tar.gz -o mysql.tar.gz
-          tar xzf mysql.tar.gz
+          wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-linux-glibc2.28-x86_64.tar.gz
+          tar xzf mysql-8.0.35-linux-glibc2.28-x86_64.tar.gz
           tar czf mysql-8.0.35-linux-amd64.tar.gz -C mysql-8.0.35-linux-glibc2.28-x86_64/bin mysqld
 
       - name: Download MySQL (Windows)
@@ -45,7 +45,8 @@ jobs:
         run: |
           curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.35-winx64.zip -o mysql.zip
           7z x mysql.zip
-          7z a mysql-8.0.35-windows-amd64.zip mysql-8.0.35-winx64/bin/mysqld.exe
+          cd mysql-8.0.35-winx64/bin
+          7z a ../../mysql-8.0.35-windows-amd64.zip mysqld.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
