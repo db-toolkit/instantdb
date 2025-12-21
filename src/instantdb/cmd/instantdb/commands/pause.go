@@ -5,15 +5,16 @@ import (
 	"fmt"
 
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/ui"
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 // PauseCmd returns the pause command
 func PauseCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "pause [instance-id]",
+		Use:   "pause [instance-name-or-id]",
 		Short: "Pause a running instance",
-		Long:  `Pause a running PostgreSQL instance. The data is preserved and can be resumed later.`,
+		Long:  `Pause a running instance by name or ID. The data is preserved and can be resumed later.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runPause,
 	}
@@ -21,7 +22,11 @@ func PauseCmd() *cobra.Command {
 
 func runPause(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	instanceID := args[0]
+	
+	instanceID, err := utils.ResolveInstance(args[0])
+	if err != nil {
+		return err
+	}
 
 	engine, err := GetEngineForInstance(instanceID)
 	if err != nil {

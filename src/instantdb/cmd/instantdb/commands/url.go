@@ -3,13 +3,14 @@ package commands
 import (
 	"fmt"
 
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 // URLCmd returns the url command
 func URLCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "url [instance-id]",
+		Use:   "url [instance-name-or-id]",
 		Short: "Get connection URL for an instance",
 		Long:  `Get the PostgreSQL connection URL for an instance.`,
 		Args:  cobra.ExactArgs(1),
@@ -18,7 +19,10 @@ func URLCmd() *cobra.Command {
 }
 
 func runURL(cmd *cobra.Command, args []string) error {
-	instanceID := args[0]
+	instanceID, err := utils.ResolveInstance(args[0])
+	if err != nil {
+		return err
+	}
 
 	engine, err := GetEngineForInstance(instanceID)
 	if err != nil {

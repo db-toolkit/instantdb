@@ -5,13 +5,14 @@ import (
 	"fmt"
 
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/ui"
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 // StatusCmd returns the status command
 func StatusCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status [instance-id]",
+		Use:   "status [instance-name-or-id]",
 		Short: "Check status of an instance",
 		Long:  `Check the health and status of a running instance.`,
 		Args:  cobra.ExactArgs(1),
@@ -21,7 +22,10 @@ func StatusCmd() *cobra.Command {
 
 func runStatus(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	instanceID := args[0]
+	instanceID, err := utils.ResolveInstance(args[0])
+	if err != nil {
+		return err
+	}
 
 	engine, err := GetEngineForInstance(instanceID)
 	if err != nil {

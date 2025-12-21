@@ -5,15 +5,16 @@ import (
 	"fmt"
 
 	"github.com/db-toolkit/instant-db/src/instantdb/internal/ui"
+	"github.com/db-toolkit/instant-db/src/instantdb/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 // StopCmd returns the stop command
 func StopCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "stop [instance-id]",
+		Use:   "stop [instance-name-or-id]",
 		Short: "Stop a running instance",
-		Long:  `Stop a running PostgreSQL instance and clean up resources.`,
+		Long:  `Stop a running instance by name or ID and clean up resources.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runStop,
 	}
@@ -21,7 +22,11 @@ func StopCmd() *cobra.Command {
 
 func runStop(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	instanceID := args[0]
+	
+	instanceID, err := utils.ResolveInstance(args[0])
+	if err != nil {
+		return err
+	}
 
 	engine, err := GetEngineForInstance(instanceID)
 	if err != nil {
