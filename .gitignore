@@ -35,4 +35,4 @@ data/
 
 # Logs
 *.log
-*.md
+mysql.md

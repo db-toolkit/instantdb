@@ -13,4 +13,3 @@
 - Pause/resume functionality to save resources
 - Beautiful CLI UI with Bubble Tea (spinners, prompts, tables)
 - Cross-platform support (macOS, Linux, Windows)
-- Automated GitHub Actions workflows for building binaries
