@@ -41,18 +41,37 @@ func RenderInstanceTable(instances []*types.Instance) string {
 func RenderInstanceDetails(instance *types.Instance) string {
 	var b strings.Builder
 
-	b.WriteString("\n" + SuccessStyle.Render("✅ PostgreSQL instance started successfully!\n\n"))
+	engineName := "PostgreSQL"
+	connScheme := "postgresql"
+	connDB := "/postgres"
+	
+	switch instance.Engine {
+	case "mysql":
+		engineName = "MySQL"
+		connScheme = "mysql"
+		connDB = "/mysql"
+	case "redis":
+		engineName = "Redis"
+		connScheme = "redis"
+		connDB = ""
+	}
 
-	// Simple details
+	b.WriteString("\n" + SuccessStyle.Render(fmt.Sprintf("✅ %s instance started successfully!\n\n", engineName)))
+
 	b.WriteString(fmt.Sprintf("  Instance ID:       %s\n", instance.ID))
 	b.WriteString(fmt.Sprintf("  Name:              %s\n", instance.Name))
 	b.WriteString(fmt.Sprintf("  Port:              %d\n", instance.Port))
 	b.WriteString(fmt.Sprintf("  Username:          %s\n", instance.Username))
 	b.WriteString(fmt.Sprintf("  Password:          %s\n", instance.Password))
-	b.WriteString(fmt.Sprintf("  Connection String: postgresql://%s:%s@localhost:%d/postgres\n\n", 
-		instance.Username, instance.Password, instance.Port))
+	
+	if instance.Engine == "redis" && instance.Password != "" {
+		b.WriteString(fmt.Sprintf("  Connection String: %s://:%s@localhost:%d%s\n\n", 
+			connScheme, instance.Password, instance.Port, connDB))
+	} else {
+		b.WriteString(fmt.Sprintf("  Connection String: %s://%s:%s@localhost:%d%s\n\n", 
+			connScheme, instance.Username, instance.Password, instance.Port, connDB))
+	}
 
-	// Tips
 	b.WriteString(InfoStyle.Render(fmt.Sprintf("💡 Stop instance: instant-db stop %s\n", instance.ID)))
 
 	return b.String()
