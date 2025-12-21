@@ -32,13 +32,18 @@ func StartCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&startPersist, "persist", false, "Keep data after stop")
 	cmd.Flags().StringVarP(&startUsername, "username", "u", "", "Database username")
 	cmd.Flags().StringVar(&startPassword, "password", "", "Database password")
-	cmd.Flags().StringVarP(&startEngine, "engine", "e", "postgres", "Database engine (postgres, mysql)")
+	cmd.Flags().StringVarP(&startEngine, "engine", "e", "", "Database engine (postgres, mysql)")
 
 	return cmd
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
+
+	// Prompt for engine if not provided
+	if startEngine == "" {
+		startEngine = ui.PromptSelect("Select database engine", []string{"postgres", "mysql"})
+	}
 
 	// Validate engine
 	if startEngine != "postgres" && startEngine != "mysql" {
@@ -69,6 +74,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		Persist:  startPersist,
 		Username: startUsername,
 		Password: startPassword,
+		Engine:   startEngine,
 	}
 
 	var instance *types.Instance

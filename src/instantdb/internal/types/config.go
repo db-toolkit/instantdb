@@ -9,4 +9,5 @@ type Config struct {
 	WithData string
 	Username string
 	Password string
+	Engine   string
 }
