@@ -50,26 +50,25 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported engine: %s (supported: postgres, mysql, redis)", startEngine)
 	}
 
-	// Prompt for username if not provided
+	// Set defaults if not provided
 	if startUsername == "" {
-		defaultUser := "postgres"
 		if startEngine == "mysql" {
-			defaultUser = "root"
+			startUsername = "root"
 		} else if startEngine == "redis" {
-			defaultUser = "default"
+			startUsername = "default"
+		} else {
+			startUsername = "postgres"
 		}
-		startUsername = ui.PromptString("Enter database username", defaultUser)
 	}
 
-	// Prompt for password if not provided
 	if startPassword == "" {
-		defaultPass := "postgres"
 		if startEngine == "mysql" {
-			defaultPass = "password"
+			startPassword = "password"
 		} else if startEngine == "redis" {
-			defaultPass = ""
+			startPassword = ""
+		} else {
+			startPassword = "postgres"
 		}
-		startPassword = ui.PromptPassword("Enter database password", defaultPass)
 	}
 
 	config := types.Config{
