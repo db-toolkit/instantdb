@@ -32,7 +32,7 @@ func NewMySQLEngine(baseDir string) *MySQLEngine {
 }
 
 func (e *MySQLEngine) downloadMySQL() error {
-	version := "8.0.35"
+	version := "8.0.40"
 	platform := "darwin-universal"
 	
 	if runtime.GOOS == "linux" {
@@ -46,7 +46,7 @@ func (e *MySQLEngine) downloadMySQL() error {
 		ext = ".zip"
 	}
 	
-	url := fmt.Sprintf("https://github.com/db-toolkit/instant-db/releases/download/binaries-v1.0.0/mysql-%s-%s%s", version, platform, ext)
+	url := fmt.Sprintf("https://github.com/db-toolkit/instant-db/releases/download/binaries-v0.1.0/mysql-%s-%s%s", version, platform, ext)
 	
 	tmpFile := filepath.Join(e.binaryDir, "mysql"+ext)
 	
