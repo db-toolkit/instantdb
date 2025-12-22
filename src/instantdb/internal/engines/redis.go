@@ -47,7 +47,7 @@ func (e *RedisEngine) downloadRedis() error {
 		ext = ".zip"
 	}
 	
-	url := fmt.Sprintf("https://github.com/db-toolkit/instant-db/releases/download/binaries-v1.0.0/redis-%s-%s%s", version, platform, ext)
+	url := fmt.Sprintf("https://github.com/db-toolkit/instantdb/releases/download/binaries-v0.1.0/redis-%s-%s%s", version, platform, ext)
 	
 	tmpFile := filepath.Join(e.binaryDir, "redis"+ext)
 	
