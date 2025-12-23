@@ -24,7 +24,7 @@ A CLI tool that spins up isolated database instances instantly for development, 
 
 ```bash
 # Quick install
-curl -sSL https://raw.githubusercontent.com/db-toolkit/instant-db/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/db-toolkit/instantdb/main/install.sh | bash
 
 # Or manual install
 git clone https://github.com/db-toolkit/instant-db.git
