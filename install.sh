@@ -35,7 +35,7 @@ esac
 
 # Get latest release version
 echo "📦 Fetching latest release..."
-LATEST_VERSION=$(curl -s https://api.github.com/repos/db-toolkit/instant-db/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_VERSION=$(curl -s https://api.github.com/repos/db-toolkit/instantdb/tags | grep '"name":' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_VERSION" ]; then
     echo "❌ Failed to fetch latest version"
@@ -43,7 +43,7 @@ if [ -z "$LATEST_VERSION" ]; then
 fi
 
 BINARY_NAME="instant-db-${OS}-${ARCH}"
-DOWNLOAD_URL="https://github.com/db-toolkit/instant-db/releases/download/${LATEST_VERSION}/${BINARY_NAME}"
+DOWNLOAD_URL="https://github.com/db-toolkit/instantdb/releases/download/${LATEST_VERSION}/${BINARY_NAME}"
 
 echo "📥 Downloading instant-db ${LATEST_VERSION} for ${OS}-${ARCH}..."
 curl -L "$DOWNLOAD_URL" -o instant-db || {
