@@ -52,16 +52,21 @@ func (m promptModel) View() string {
 	prompt := LabelStyle.Render(m.label)
 	if m.defaultValue != "" {
 		prompt += MutedStyle.Render(fmt.Sprintf(" (default: %s)", m.defaultValue))
+	} else {
+		prompt += MutedStyle.Render(" (press enter to skip)")
 	}
 	prompt += ": "
 
-	return prompt + m.textInput.View()
+	return prompt + m.textInput.View() + "\n"
 }
 
 // PromptString prompts the user for a string input
 func PromptString(label, defaultValue string) string {
 	ti := textinput.New()
 	ti.Placeholder = defaultValue
+	if defaultValue == "" {
+		ti.Placeholder = "optional"
+	}
 	ti.Focus()
 	ti.CharLimit = 100
 	ti.Width = 30
@@ -79,6 +84,11 @@ func PromptString(label, defaultValue string) string {
 	}
 
 	if finalModel, ok := finalModel.(promptModel); ok {
+		if finalModel.value != "" {
+			fmt.Printf("%s %s\n\n", SuccessStyle.Render("✓"), finalModel.value)
+		} else {
+			fmt.Printf("%s %s\n\n", MutedStyle.Render("✓"), "skipped")
+		}
 		return finalModel.value
 	}
 

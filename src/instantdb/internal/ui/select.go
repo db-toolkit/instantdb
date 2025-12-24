@@ -60,7 +60,7 @@ func (m selectModel) View() string {
 		s += fmt.Sprintf("%s %s\n", cursor, choice)
 	}
 
-	s += "\n" + MutedStyle.Render("(↑/↓ to move, enter to select)")
+	s += "\n" + MutedStyle.Render("(↑/↓ to move, enter to select, esc to cancel)")
 
 	return s
 }
@@ -78,6 +78,8 @@ func PromptSelect(label string, choices []string) string {
 	}
 
 	if finalModel, ok := finalModel.(selectModel); ok {
+		// Show what was selected
+		fmt.Printf("%s %s\n\n", SuccessStyle.Render("✓"), finalModel.selected)
 		return finalModel.selected
 	}
 
