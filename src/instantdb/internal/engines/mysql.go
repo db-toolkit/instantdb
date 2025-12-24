@@ -172,7 +172,7 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		config.Username = "root"
 	}
 	if config.Password == "" {
-		config.Password = "password"
+		config.Password = ""
 	}
 
 	if err := os.MkdirAll(config.DataDir, 0755); err != nil {
