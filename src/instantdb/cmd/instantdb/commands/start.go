@@ -40,13 +40,16 @@ func StartCmd() *cobra.Command {
 func runStart(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
+	// Interactive mode flag
+	interactiveMode := startEngine == ""
+
 	// Prompt for engine if not provided
 	if startEngine == "" {
 		startEngine = ui.PromptSelect("Select database engine", []string{"postgres", "redis"})
 		
 		// Prompt for name in interactive mode
 		if startName == "" {
-			startName = ui.PromptString("Enter instance name (optional)", "")
+			startName = ui.PromptString("Enter instance name", "")
 		}
 	}
 
@@ -55,25 +58,32 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported engine: %s (supported: postgres, mysql, redis)", startEngine)
 	}
 
-	// Set defaults if not provided
-	if startUsername == "" {
-		if startEngine == "mysql" {
-			startUsername = "root"
-		} else if startEngine == "redis" {
-			startUsername = "default"
-		} else {
-			startUsername = "postgres"
+	// Set defaults
+	defaultUsername := "postgres"
+	defaultPassword := "postgres"
+	if startEngine == "mysql" {
+		defaultUsername = "root"
+		defaultPassword = "password"
+	} else if startEngine == "redis" {
+		defaultUsername = "default"
+		defaultPassword = ""
+	}
+
+	// In interactive mode, ask if user wants to customize credentials
+	if interactiveMode && startUsername == "" && startPassword == "" {
+		customize := ui.PromptSelect("Use default credentials?", []string{"Yes", "No"})
+		if customize == "No" {
+			startUsername = ui.PromptString("Enter username", defaultUsername)
+			startPassword = ui.PromptString("Enter password", defaultPassword)
 		}
 	}
 
+	// Apply defaults if still not set
+	if startUsername == "" {
+		startUsername = defaultUsername
+	}
 	if startPassword == "" {
-		if startEngine == "mysql" {
-			startPassword = "password"
-		} else if startEngine == "redis" {
-			startPassword = ""
-		} else {
-			startPassword = "postgres"
-		}
+		startPassword = defaultPassword
 	}
 
 	config := types.Config{
