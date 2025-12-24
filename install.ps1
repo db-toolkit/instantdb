@@ -42,4 +42,4 @@ Write-Host ""
 Write-Host "🎉 Get started:" -ForegroundColor Cyan
 Write-Host "   instant-db start" -ForegroundColor White
 Write-Host ""
-Write-Host "📖 For more info: https://github.com/db-toolkit/instant-db" -ForegroundColor Cyan
+Write-Host "📖 For more info: https://github.com/db-toolkit/instantdb" -ForegroundColor Cyan
