@@ -32,7 +32,14 @@ jobs:
           tar xzf mysql-8.0.40-macos14-x86_64.tar.gz
           mkdir -p mysql-universal/bin mysql-universal/lib
           lipo -create mysql-8.0.40-macos14-arm64/bin/mysqld mysql-8.0.40-macos14-x86_64/bin/mysqld -output mysql-universal/bin/mysqld
-          cp -r mysql-8.0.40-macos14-arm64/lib/* mysql-universal/lib/
+          for lib in mysql-8.0.40-macos14-arm64/lib/*.dylib; do
+            libname=$(basename "$lib")
+            if [ -f "mysql-8.0.40-macos14-x86_64/lib/$libname" ]; then
+              lipo -create "$lib" "mysql-8.0.40-macos14-x86_64/lib/$libname" -output "mysql-universal/lib/$libname"
+            else
+              cp "$lib" "mysql-universal/lib/$libname"
+            fi
+          done
           tar czf mysql-8.0.40-darwin-universal.tar.gz -C mysql-universal .
 
       - name: Download MySQL (Linux)
