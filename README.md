@@ -38,14 +38,11 @@ sudo mv instant-db /usr/local/bin/
 ### Windows
 
 ```powershell
-# Download the latest release from GitHub
-# https://github.com/db-toolkit/instantdb/releases
+# Quick install (run in PowerShell as Administrator)
+irm https://raw.githubusercontent.com/db-toolkit/instantdb/main/install.ps1 | iex
 
-# Or build from source
-git clone https://github.com/db-toolkit/instant-db.git
-cd instant-db
-go build -o instant-db.exe src/instantdb/cmd/instantdb/main.go
-# Move instant-db.exe to a directory in your PATH
+# Or download manually from releases
+# https://github.com/db-toolkit/instantdb/releases
 ```
 
 ## Quick Start
