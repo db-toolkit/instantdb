@@ -35,7 +35,7 @@ go build -o instant-db src/instantdb/cmd/instantdb/main.go
 sudo mv instant-db /usr/local/bin/
 ```
 
-### Windows
+### Windows (Untested)
 
 ```powershell
 # Quick install (run in PowerShell as Administrator)
