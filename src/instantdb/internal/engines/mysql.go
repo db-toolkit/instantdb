@@ -83,23 +83,35 @@ func (e *MySQLEngine) downloadMySQL() error {
 		defer gzr.Close()
 
 		tr := tar.NewReader(gzr)
-		_, err = tr.Next()
-		if err != nil {
-			return err
+		
+		for {
+			header, err := tr.Next()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return err
+			}
+			
+			target := filepath.Join(e.binaryDir, header.Name)
+			
+			switch header.Typeflag {
+			case tar.TypeDir:
+				os.MkdirAll(target, 0755)
+			case tar.TypeReg:
+				os.MkdirAll(filepath.Dir(target), 0755)
+				outFile, err := os.Create(target)
+				if err != nil {
+					return err
+				}
+				if _, err := io.Copy(outFile, tr); err != nil {
+					outFile.Close()
+					return err
+				}
+				outFile.Close()
+				os.Chmod(target, os.FileMode(header.Mode))
+			}
 		}
-
-		mysqlBinary := filepath.Join(e.binaryDir, "mysqld")
-		outFile, err := os.Create(mysqlBinary)
-		if err != nil {
-			return err
-		}
-		defer outFile.Close()
-
-		if _, err := io.Copy(outFile, tr); err != nil {
-			return err
-		}
-
-		os.Chmod(mysqlBinary, 0755)
 	}
 
 	os.Remove(tmpFile)
@@ -107,7 +119,7 @@ func (e *MySQLEngine) downloadMySQL() error {
 }
 
 func (e *MySQLEngine) ensureMySQL() (string, error) {
-	mysqlBinary := filepath.Join(e.binaryDir, "mysqld")
+	mysqlBinary := filepath.Join(e.binaryDir, "bin", "mysqld")
 	
 	if _, err := os.Stat(mysqlBinary); err == nil {
 		return mysqlBinary, nil

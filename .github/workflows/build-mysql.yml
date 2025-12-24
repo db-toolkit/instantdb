@@ -30,23 +30,31 @@ jobs:
           wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.40-macos14-x86_64.tar.gz
           tar xzf mysql-8.0.40-macos14-arm64.tar.gz
           tar xzf mysql-8.0.40-macos14-x86_64.tar.gz
-          lipo -create mysql-8.0.40-macos14-arm64/bin/mysqld mysql-8.0.40-macos14-x86_64/bin/mysqld -output mysqld
-          tar czf mysql-8.0.40-darwin-universal.tar.gz mysqld
+          mkdir -p mysql-universal/bin mysql-universal/lib
+          lipo -create mysql-8.0.40-macos14-arm64/bin/mysqld mysql-8.0.40-macos14-x86_64/bin/mysqld -output mysql-universal/bin/mysqld
+          cp -r mysql-8.0.40-macos14-arm64/lib/* mysql-universal/lib/
+          tar czf mysql-8.0.40-darwin-universal.tar.gz -C mysql-universal .
 
       - name: Download MySQL (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           wget https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.40-linux-glibc2.28-x86_64.tar.xz
           tar xf mysql-8.0.40-linux-glibc2.28-x86_64.tar.xz
-          tar czf mysql-8.0.40-linux-amd64.tar.gz -C mysql-8.0.40-linux-glibc2.28-x86_64/bin mysqld
+          mkdir -p mysql-linux
+          cp -r mysql-8.0.40-linux-glibc2.28-x86_64/bin mysql-linux/
+          cp -r mysql-8.0.40-linux-glibc2.28-x86_64/lib mysql-linux/
+          tar czf mysql-8.0.40-linux-amd64.tar.gz -C mysql-linux .
 
       - name: Download MySQL (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           curl -L https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.40-winx64.zip -o mysql.zip
           7z x mysql.zip
-          cd mysql-8.0.40-winx64/bin
-          7z a ../../mysql-8.0.40-windows-amd64.zip mysqld.exe
+          mkdir mysql-windows
+          xcopy mysql-8.0.40-winx64\bin mysql-windows\bin\ /E /I
+          xcopy mysql-8.0.40-winx64\lib mysql-windows\lib\ /E /I
+          cd mysql-windows
+          7z a ../mysql-8.0.40-windows-amd64.zip .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
