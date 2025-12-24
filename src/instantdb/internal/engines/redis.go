@@ -69,8 +69,7 @@ func (e *RedisEngine) downloadRedis() error {
 
 	// Extract
 	if runtime.GOOS == "windows" {
-		// TODO: Extract zip
-		return fmt.Errorf("windows not yet supported")
+		return fmt.Errorf("windows automatic download not yet supported, please extract manually")
 	} else {
 		file, err := os.Open(tmpFile)
 		if err != nil {

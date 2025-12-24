@@ -68,7 +68,9 @@ func (e *MySQLEngine) downloadMySQL() error {
 
 	// Extract
 	if runtime.GOOS == "windows" {
-		return fmt.Errorf("windows not yet supported")
+		// Windows zip extraction not yet implemented
+		// For now, users should manually extract or we need to add zip support
+		return fmt.Errorf("windows automatic download not yet supported, please extract manually")
 	} else {
 		file, err := os.Open(tmpFile)
 		if err != nil {
@@ -113,19 +115,22 @@ func (e *MySQLEngine) downloadMySQL() error {
 			}
 		}
 		
-		// Copy lib files to bin directory for @loader_path resolution
+		// Copy lib files to bin directory for @loader_path resolution (macOS/Linux)
 		libDir := filepath.Join(e.binaryDir, "lib")
 		binDir := filepath.Join(e.binaryDir, "bin")
 		if entries, err := os.ReadDir(libDir); err == nil {
 			for _, entry := range entries {
-				if !entry.IsDir() && filepath.Ext(entry.Name()) == ".dylib" {
-					src := filepath.Join(libDir, entry.Name())
-					dst := filepath.Join(binDir, entry.Name())
-					srcFile, _ := os.Open(src)
-					dstFile, _ := os.Create(dst)
-					io.Copy(dstFile, srcFile)
-					srcFile.Close()
-					dstFile.Close()
+				if !entry.IsDir() {
+					ext := filepath.Ext(entry.Name())
+					if ext == ".dylib" || ext == ".so" {
+						src := filepath.Join(libDir, entry.Name())
+						dst := filepath.Join(binDir, entry.Name())
+						srcFile, _ := os.Open(src)
+						dstFile, _ := os.Create(dst)
+						io.Copy(dstFile, srcFile)
+						srcFile.Close()
+						dstFile.Close()
+					}
 				}
 			}
 		}
@@ -186,7 +191,7 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 
 	// Initialize MySQL data directory
 	initCmd := exec.Command(mysqlBinary, "--initialize-insecure", "--datadir="+config.DataDir)
-	initCmd.Env = append(os.Environ(), "DYLD_LIBRARY_PATH="+filepath.Join(e.binaryDir, "lib"))
+	initCmd.Env = append(os.Environ(), getLibraryPathEnv(e.binaryDir))
 	if err := initCmd.Run(); err != nil {
 		os.RemoveAll(config.DataDir)
 		return nil, fmt.Errorf("failed to initialize mysql: %w", err)
@@ -198,7 +203,7 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		"--port="+fmt.Sprintf("%d", config.Port),
 		"--bind-address=127.0.0.1",
 	)
-	cmd.Env = append(os.Environ(), "DYLD_LIBRARY_PATH="+filepath.Join(e.binaryDir, "lib"))
+	cmd.Env = append(os.Environ(), getLibraryPathEnv(e.binaryDir))
 	
 	logFile := filepath.Join(config.DataDir, "mysql.log")
 	logFd, _ := os.Create(logFile)
@@ -281,7 +286,7 @@ func (e *MySQLEngine) Resume(ctx context.Context, instanceID string) error {
 		"--port="+fmt.Sprintf("%d", instance.Port),
 		"--bind-address=127.0.0.1",
 	)
-	cmd.Env = append(os.Environ(), "DYLD_LIBRARY_PATH="+filepath.Join(e.binaryDir, "lib"))
+	cmd.Env = append(os.Environ(), getLibraryPathEnv(e.binaryDir))
 	
 	logFile := filepath.Join(instance.DataDir, "mysql.log")
 	logFd, _ := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
