@@ -112,6 +112,23 @@ func (e *MySQLEngine) downloadMySQL() error {
 				os.Chmod(target, os.FileMode(header.Mode))
 			}
 		}
+		
+		// Copy lib files to bin directory for @loader_path resolution
+		libDir := filepath.Join(e.binaryDir, "lib")
+		binDir := filepath.Join(e.binaryDir, "bin")
+		if entries, err := os.ReadDir(libDir); err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() && filepath.Ext(entry.Name()) == ".dylib" {
+					src := filepath.Join(libDir, entry.Name())
+					dst := filepath.Join(binDir, entry.Name())
+					srcFile, _ := os.Open(src)
+					dstFile, _ := os.Create(dst)
+					io.Copy(dstFile, srcFile)
+					srcFile.Close()
+					dstFile.Close()
+				}
+			}
+		}
 	}
 
 	os.Remove(tmpFile)
@@ -169,6 +186,7 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 
 	// Initialize MySQL data directory
 	initCmd := exec.Command(mysqlBinary, "--initialize-insecure", "--datadir="+config.DataDir)
+	initCmd.Env = append(os.Environ(), "DYLD_LIBRARY_PATH="+filepath.Join(e.binaryDir, "lib"))
 	if err := initCmd.Run(); err != nil {
 		os.RemoveAll(config.DataDir)
 		return nil, fmt.Errorf("failed to initialize mysql: %w", err)
@@ -180,6 +198,7 @@ func (e *MySQLEngine) Start(ctx context.Context, config types.Config) (*types.In
 		"--port="+fmt.Sprintf("%d", config.Port),
 		"--bind-address=127.0.0.1",
 	)
+	cmd.Env = append(os.Environ(), "DYLD_LIBRARY_PATH="+filepath.Join(e.binaryDir, "lib"))
 	
 	logFile := filepath.Join(config.DataDir, "mysql.log")
 	logFd, _ := os.Create(logFile)
@@ -262,6 +281,7 @@ func (e *MySQLEngine) Resume(ctx context.Context, instanceID string) error {
 		"--port="+fmt.Sprintf("%d", instance.Port),
 		"--bind-address=127.0.0.1",
 	)
+	cmd.Env = append(os.Environ(), "DYLD_LIBRARY_PATH="+filepath.Join(e.binaryDir, "lib"))
 	
 	logFile := filepath.Join(instance.DataDir, "mysql.log")
 	logFd, _ := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
