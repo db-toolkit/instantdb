@@ -4,7 +4,7 @@ A CLI tool that spins up isolated database instances instantly for development, 
 
 ## Features
 
-- 🚀 Start PostgreSQL or Redis instances in seconds
+- 🚀 Start PostgreSQL, MySQL, or Redis instances in seconds
 - 🔒 Fully isolated - no conflicts with existing databases
 - 🧹 Clean shutdown - zero traces left behind
 - 💻 Cross-platform - macOS, Linux, Windows
@@ -17,8 +17,8 @@ A CLI tool that spins up isolated database instances instantly for development, 
 ## Supported Databases
 
 - **PostgreSQL** - Embedded binaries, zero dependencies
+- **MySQL** - Embedded binaries, zero dependencies
 - **Redis** - Embedded binaries, zero dependencies
-- **MySQL** - Coming soon
 
 ## Installation
 
@@ -36,11 +36,14 @@ sudo mv instant-db /usr/local/bin/
 ## Quick Start
 
 ```bash
-# Start an instance (interactive - choose PostgreSQL or Redis)
+# Start an instance (interactive - choose PostgreSQL, MySQL, or Redis)
 instant-db start
 
 # Start PostgreSQL with a name
 instant-db start -e postgres --name my-app
+
+# Start MySQL with a name
+instant-db start -e mysql --name my-db
 
 # Start Redis with a name
 instant-db start -e redis --name my-cache
@@ -69,6 +72,7 @@ instant-db start
 
 # Start with flags (non-interactive)
 instant-db start -e postgres --name myapp -u myuser --password mypass --port 5432 --persist
+instant-db start -e mysql --name mydb -u root --password mypass --persist
 instant-db start -e redis --name mycache --password mypass --persist
 
 # Stop instance (removes data unless --persist was used)
@@ -122,6 +126,19 @@ instant-db url my-redis
 
 # Connect with redis-cli
 redis-cli -h 127.0.0.1 -p 63791 -a secret
+```
+
+### MySQL
+```bash
+# Start MySQL
+instant-db start -e mysql --name my-mysql
+
+# Get connection URL
+instant-db url my-mysql
+# Output: mysql://root@127.0.0.1:50762/mysql
+
+# Connect with mysql client
+mysql -h 127.0.0.1 -P 50762 -u root
 ```
 
 ## Contributing
